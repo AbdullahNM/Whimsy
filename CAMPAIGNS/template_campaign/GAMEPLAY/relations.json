@@ -1,0 +1,12 @@
+{
+  "campaign_id": "template_campaign",
+  "key_contacts": [
+    {
+      "name": "Handler Cross",
+      "role": "Contract Coordinator",
+      "standing": "Professional / Transactional",
+      "status": "Primary Contact",
+      "notes": "Supplies mission parameters and logistics support."
+    }
+  ]
+}

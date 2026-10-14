@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CampaignOntologySchema",
+  "description": "Formal schema for campaign entities, genealogical family trees, institutional hierarchies, and relational knowledge graphs to eliminate token collisions and character mix-ups.",
+  "type": "object",
+  "required": ["campaign_id", "schema_version", "disambiguation_rules", "houses_and_lineages", "characters", "cohort_rosters", "relational_graph_edges"],
+  "properties": {
+    "campaign_id": {
+      "type": "string",
+      "description": "Unique campaign slug identifier"
+    },
+    "schema_version": {
+      "type": "string",
+      "description": "Semantic versioning of the ontology format"
+    },
+    "description": {
+      "type": "string",
+      "description": "Overview of the ontology's purpose and scope"
+    },
+    "disambiguation_rules": {
+      "type": "array",
+      "description": "Mandatory anti-collision guards for characters sharing names, titles, or family ties",
+      "items": {
+        "type": "object",
+        "required": ["rule_id", "confusion_risk", "entities", "operational_guardrail"],
+        "properties": {
+          "rule_id": { "type": "string" },
+          "confusion_risk": { "type": "string" },
+          "entities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "distinguishing_identity", "role_and_tier"],
+              "properties": {
+                "id": { "type": "string" },
+                "distinguishing_identity": { "type": "string" },
+                "role_and_tier": { "type": "string" }
+              }
+            }
+          },
+          "operational_guardrail": { "type": "string" }
+        }
+      }
+    },
+    "houses_and_lineages": {
+      "type": "object",
+      "description": "Dictionary of patrician houses, noble clans, and commoner artisan lineages",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["id", "name", "social_rank", "seat_or_origin", "motto", "traditions", "members"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "social_rank": { "type": "string" },
+          "seat_or_origin": { "type": "string" },
+          "motto": { "type": "string" },
+          "sigil": { "type": "string" },
+          "traditions": { "type": "string" },
+          "cadet_branches": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "pedigree_tree": {
+            "type": "object",
+            "description": "Hierarchical genealogical tree by generations",
+            "properties": {
+              "patriarch_or_head": { "type": "string" },
+              "elder_generation": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "active_generation": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "junior_generation": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          },
+          "members": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "characters": {
+      "type": "object",
+      "description": "Exhaustive registry of all dramatis personae and their genealogical/social properties",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["id", "name", "house_id", "kinship", "institutional", "social_bonds"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "titles_and_aliases": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "age": { "type": ["integer", "string", "null"] },
+          "birthday": { "type": ["string", "null"] },
+          "gender": { "type": "string" },
+          "house_id": { "type": "string" },
+          "house_branch": { "type": ["string", "null"] },
+          "kinship": {
+            "type": "object",
+            "properties": {
+              "father_id": { "type": ["string", "null"] },
+              "mother_id": { "type": ["string", "null"] },
+              "siblings": { "type": "array", "items": { "type": "string" } },
+              "uncles_and_aunts": { "type": "array", "items": { "type": "string" } },
+              "cousins": { "type": "array", "items": { "type": "string" } },
+              "children": { "type": "array", "items": { "type": "string" } },
+              "extended_kin": { "type": "array", "items": { "type": "string" } }
+            }
+          },
+          "institutional": {
+            "type": "object",
+            "required": ["affiliation", "rank_or_tier"],
+            "properties": {
+              "affiliation": { "type": "string" },
+              "division": { "type": ["string", "null"] },
+              "cohort": { "type": ["string", "null"] },
+              "academic_year": { "type": ["string", "null"] },
+              "rank_or_tier": { "type": "string" },
+              "innate_talent": { "type": ["string", "null"] },
+              "talent_classification": { "type": ["string", "null"] }
+            }
+          },
+          "social_bonds": {
+            "type": "object",
+            "properties": {
+              "allies": { "type": "array", "items": { "type": "string" } },
+              "rivals": { "type": "array", "items": { "type": "string" } },
+              "mentors": { "type": "array", "items": { "type": "string" } },
+              "mentees": { "type": "array", "items": { "type": "string" } },
+              "romantic_bond": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": ["none", "unspoken_affection", "mutual_courtship", "one_sided_crush", "prospective_player_romance"]
+                  },
+                  "partner_id": { "type": ["string", "null"] },
+                  "dynamic": { "type": "string" },
+                  "narrative_phase": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "cohort_rosters": {
+      "type": "object",
+      "description": "Academy cohort rosters and tactical doctrine groupings",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["cohort_name", "division", "tactical_doctrine", "members"],
+        "properties": {
+          "cohort_name": { "type": "string" },
+          "division": { "type": "string" },
+          "tactical_doctrine": { "type": "string" },
+          "members": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "relational_graph_edges": {
+      "type": "array",
+      "description": "Explicit directed and undirected relational edges for graph traversal and visual rendering",
+      "items": {
+        "type": "object",
+        "required": ["source", "target", "type", "description"],
+        "properties": {
+          "source": { "type": "string" },
+          "target": { "type": "string" },
+          "type": {
+            "type": "string",
+            "enum": [
+              "kinship_parent",
+              "kinship_sibling",
+              "kinship_cousin",
+              "kinship_uncle_nephew",
+              "kinship_ancestral",
+              "squad_comrade",
+              "peer_rival",
+              "mentor_student",
+              "courtship_affection",
+              "adversary_hostile",
+              "commercial_patron",
+              "institutional_command"
+            ]
+          },
+          "directed": { "type": "boolean" },
+          "description": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "campaign_id": "template_campaign",
+  "purse": {
+    "display": "500 \u20a1",
+    "credits": 500
+  },
+  "equipped": [
+    {
+      "name": "Multi-Spectrum Optical Scanner",
+      "slot": "Headwear / Visor",
+      "condition": "100% Operational",
+      "specs": "Thermal, electromagnetic, and acoustic overlay."
+    }
+  ]
+}
