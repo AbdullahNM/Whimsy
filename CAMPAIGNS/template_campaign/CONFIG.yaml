@@ -1,0 +1,5 @@
+campaign_id: template_campaign
+active_turn_window: 15
+state_schema_version: 2
+resolution_mode: consequence_driven
+public_state_only: true
