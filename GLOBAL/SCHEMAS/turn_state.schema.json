@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TurnStateSchema",
+  "description": "Deterministic public state for a live campaign (GAMEPLAY/status.json). GM-private facts must never be stored here.",
+  "type": "object",
+  "required": ["schema_version", "campaign_id", "turn", "timeline", "progression", "scene_anchor", "public_state", "clocks"],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1, "description": "Recommended: 2 for the consequence-and-clocks contract." },
+    "campaign_id": { "type": "string" },
+    "turn": { "type": "integer", "minimum": 1 },
+    "timeline": { "type": "string" },
+    "progression": {
+      "type": "object",
+      "required": ["checkpoint_tokens", "checkpoint_max"]
+    },
+    "purse": {
+      "type": "object",
+      "properties": {
+        "credits": { "type": "integer" },
+        "platinum": { "type": "integer" },
+        "gold": { "type": "integer" },
+        "silver": { "type": "integer" },
+        "copper": { "type": "integer" },
+        "display": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "scene_anchor": {
+      "type": "object",
+      "required": ["location", "context", "time"],
+      "properties": {
+        "location": { "type": "string" },
+        "context": { "type": "string" },
+        "time": { "type": "string" }
+      }
+    },
+    "public_state": {
+      "type": "object",
+      "description": "Facts currently known to the protagonist.",
+      "properties": {
+        "flags": { "type": "object" },
+        "conditions": { "type": "array", "items": { "type": "string" } },
+        "open_threads": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "clocks": {
+      "type": "array",
+      "description": "Known or suspected pressures. Never expose gm_private clocks here.",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "current", "max", "visibility"],
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "current": { "type": "integer", "minimum": 0 },
+          "max": { "type": "integer", "minimum": 1 },
+          "visibility": { "type": "string", "enum": ["known", "suspected"] },
+          "advance_trigger": { "type": "string" }
+        }
+      }
+    }
+  }
+}

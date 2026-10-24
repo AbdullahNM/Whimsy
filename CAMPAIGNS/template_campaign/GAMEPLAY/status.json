@@ -1,0 +1,63 @@
+{
+  "schema_version": 2,
+  "campaign_id": "template_campaign",
+  "turn": 1,
+  "timeline": "Act I \u2014 Dawn of Chapter One",
+  "character": {
+    "name": "Alex Mercer",
+    "archetype": "Independent Specialist",
+    "origin": "Metro Core",
+    "status": "Active Agent",
+    "alignment": "Pragmatic Neutral",
+    "reputation": "Rising",
+    "special_trait": "Rapid Adaptive Learning"
+  },
+  "progression": {
+    "energy": 100,
+    "energy_max": 100,
+    "stress": 10,
+    "stress_max": 100,
+    "checkpoint_tokens": 5,
+    "checkpoint_max": 5
+  },
+  "purse": {
+    "credits": 500,
+    "display": "500 \u20a1"
+  },
+  "competencies": {
+    "analysis": 35,
+    "negotiation": 30,
+    "covert_operations": 25,
+    "technical_aptitude": 28
+  },
+  "public_state": {
+    "flags": {},
+    "conditions": [],
+    "open_threads": [
+      "Decide whether to accept the first contract."
+    ]
+  },
+  "clocks": [
+    {
+      "id": "contract_deadline",
+      "label": "Contract deadline",
+      "current": 0,
+      "max": 4,
+      "visibility": "known",
+      "advance_trigger": "Time passes without a decision."
+    },
+    {
+      "id": "rival_interest",
+      "label": "Rival interest",
+      "current": 0,
+      "max": 6,
+      "visibility": "suspected",
+      "advance_trigger": "The protagonist creates public attention."
+    }
+  ],
+  "scene_anchor": {
+    "location": "Sub-Level 4 Staging Room, Terminal Bay A",
+    "context": "Briefing datapad activated; first contract terms displayed awaiting agent confirmation.",
+    "time": "06:00 Local Cycle"
+  }
+}
