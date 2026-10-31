@@ -1,0 +1,40 @@
+{
+  "campaign_id": "template_campaign",
+  "disambiguation_rules": [
+    {
+      "rule_id": "NAME-01",
+      "operational_guardrail": "Always use a character's full name and role when two characters share a surname."
+    },
+    {
+      "rule_id": "NAME-02",
+      "operational_guardrail": "Never merge two NPCs with similar titles; treat each roster entry as a distinct person."
+    }
+  ],
+  "characters": {
+    "alex_mercer": {
+      "name": "Alex Mercer",
+      "role": "Protagonist",
+      "archetype": "Independent Specialist"
+    },
+    "handler_cross": {
+      "name": "Handler Cross",
+      "role": "Contract Coordinator",
+      "archetype": "Logistics Fixer"
+    }
+  },
+  "cohort_rosters": {
+    "alpha_team": {
+      "cohort_name": "Alpha Team",
+      "tactical_doctrine": "Recon-first infiltration and measured risk",
+      "members": ["alex_mercer", "handler_cross"]
+    }
+  },
+  "relational_graph_edges": [
+    {
+      "source": "handler_cross",
+      "target": "alex_mercer",
+      "type": "MENTORSHIP",
+      "description": "Cross briefs Mercer and controls contract logistics and deadlines."
+    }
+  ]
+}

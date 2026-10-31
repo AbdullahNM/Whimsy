@@ -1,0 +1,198 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CampaignInitiationSchema",
+  "description": "Genre-agnostic thematic, architectural, and UI rendering specification for any CYOA campaign (Fantasy, Sci-Fi, Teen Romance, Dystopian, Murder Mystery, etc.).",
+  "type": "object",
+  "required": ["id", "title", "genre", "theme", "metrics", "entity_header", "status_sections", "sidebar"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique folder and campaign slug identifier (e.g. template_campaign, neon_syndicate, summer_hearts, cold_case_1947)"
+    },
+    "title": {
+      "type": "string",
+      "description": "User-facing title of the campaign"
+    },
+    "genre": {
+      "type": "string",
+      "description": "Campaign genre (e.g. High Academic Fantasy, Cyberpunk / Espionage, Slice of Life Romance, Noir Detective)"
+    },
+    "theme": {
+      "type": "object",
+      "description": "Color palette, glowing accents, and typography characterizing the campaign aesthetic",
+      "required": ["bg_dark", "bg_slate", "bg_card", "gold_primary", "gold_dim", "text_ivory"],
+      "properties": {
+        "bg_dark": { "type": "string", "description": "Base app background" },
+        "bg_slate": { "type": "string", "description": "Sidebar & panel background" },
+        "bg_card": { "type": "string", "description": "Card & box background" },
+        "gold_primary": { "type": "string", "description": "Primary accent / theme color" },
+        "gold_dim": { "type": "string", "description": "Secondary / muted theme accent" },
+        "accent_glow": { "type": "string", "description": "Glow box-shadow / border highlight" },
+        "text_ivory": { "type": "string", "description": "Primary reading text color" },
+        "font_family": { "type": "string", "description": "CSS font stack (e.g. Georgia, serif or monospace or sans-serif)" }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "description": "Top-bar floating metric pills dynamically rendered on the header",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "type", "path"],
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "type": { "type": "string", "enum": ["counter", "progress", "currency", "text"] },
+          "path": { "type": "string", "description": "Dot-notation property path in status.json" },
+          "max_path": { "type": "string", "description": "Optional max-value dot-notation path" },
+          "color": { "type": "string" },
+          "regex": { "type": "string", "description": "Fallback regex for markdown-only parsing" }
+        }
+      }
+    },
+    "entity_header": {
+      "type": "object",
+      "description": "Defines the protagonist, deity, detective, or student badge card in the status tab",
+      "required": ["title_path"],
+      "properties": {
+        "title_path": { "type": "string", "description": "Path to primary name / callsign" },
+        "subtitle_path": { "type": "string", "description": "Path to title, division, or archetype" },
+        "tag_paths": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Paths to metadata tags (e.g. year, tier, background, status)"
+        }
+      }
+    },
+    "status_sections": {
+      "type": "object",
+      "description": "Dynamic accordion sections to construct in the status sidebar tab",
+      "properties": {
+        "progression_bars": {
+          "type": "object",
+          "properties": {
+            "title": { "type": "string" },
+            "bars": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["label", "path"],
+                "properties": {
+                  "label": { "type": "string" },
+                  "path": { "type": "string" },
+                  "max_path": { "type": "string" },
+                  "color": { "type": "string" },
+                  "unit": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "stat_grid": {
+          "type": "object",
+          "properties": {
+            "title": { "type": "string" },
+            "boxes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["label", "path"],
+                "properties": {
+                  "label": { "type": "string" },
+                  "path": { "type": "string" },
+                  "suffix": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "attributes_grid": {
+          "type": "object",
+          "properties": {
+            "title": { "type": "string" },
+            "dict_path": { "type": "string" },
+            "max_scale": { "type": "number" }
+          }
+        },
+        "inventory_status": {
+          "type": "object",
+          "properties": {
+            "title": { "type": "string" },
+            "array_path": { "type": "string" },
+            "item_name_key": { "type": "string" },
+            "item_status_key": { "type": "string" },
+            "item_location_key": { "type": "string" }
+          }
+        },
+        "scene_anchor": {
+          "type": "object",
+          "properties": {
+            "title": { "type": "string" },
+            "location_path": { "type": "string" },
+            "context_path": { "type": "string" },
+            "time_path": { "type": "string" }
+          }
+        }
+      }
+    },
+    "relations_spec": {
+      "type": "object",
+      "description": "Optional declarative grouping for the Relations / Social Web tab",
+      "properties": {
+        "title": { "type": "string" },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "title", "path"],
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" },
+              "path": { "type": "string" },
+              "accent_class": { "type": "string", "enum": ["close", "mentor", "warning", "neutral"] }
+            }
+          }
+        }
+      }
+    },
+    "inventory_spec": {
+      "type": "object",
+      "description": "Optional declarative grouping for the Inventory / Assets tab",
+      "properties": {
+        "title": { "type": "string" },
+        "currency_path": { "type": "string" },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "title", "path"],
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" },
+              "path": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "sidebar": {
+      "type": "object",
+      "required": ["tabs"],
+      "properties": {
+        "tabs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "label"],
+            "properties": {
+              "id": { "type": "string" },
+              "label": { "type": "string" },
+              "source": { "type": "string" },
+              "json_source": { "type": "string" },
+              "type": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

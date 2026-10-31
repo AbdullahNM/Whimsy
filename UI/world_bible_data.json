@@ -1,0 +1,16 @@
+{
+  "CORE": [
+    {
+      "id": "setting_primer",
+      "title": "Setting Primer",
+      "content": "# Setting Primer\n\nThe campaign takes place in the **Metro Core**, a dense city-state ringed by automated transit arcs and layered access controls.\n\n## Pillars\n\n- **Contracts drive the plot.** Every opportunity carries a cost, a deadline, or a rival.\n- **Resources are finite.** Energy, stress, funds, and reputation all move with your choices.\n- **Knowledge is earned.** Public facts are known or suspected; hidden truth must be discovered in play.\n- **Consequences persist.** State changes are recorded in `GAMEPLAY/` and never silently reset.\n"
+    }
+  ],
+  "PLACES": [
+    {
+      "id": "overview",
+      "title": "Places Overview",
+      "content": "# Places Overview\n\n- **Metro Core:** Central hub of commerce and contract work; layered transit arcs and checkpoints.\n- **Terminal Bay A:** Staging area where briefings and first missions begin.\n- **The Archive:** Restricted records vault guarded by layered access controls and rival interest.\n"
+    }
+  ]
+}

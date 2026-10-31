@@ -1,0 +1,131 @@
+{
+  "id": "template_campaign",
+  "title": "New Campaign Universe",
+  "genre": "Custom CYOA Universe",
+  "theme": {
+    "bg_dark": "#0d1117",
+    "bg_slate": "#161b22",
+    "bg_card": "#21262d",
+    "gold_primary": "#58a6ff",
+    "gold_dim": "#1f6feb",
+    "accent_glow": "rgba(88, 166, 255, 0.2)",
+    "text_ivory": "#f0f6fc",
+    "font_family": "system-ui, -apple-system, sans-serif"
+  },
+  "metrics": [
+    {
+      "id": "turn",
+      "label": "Turn",
+      "type": "counter",
+      "path": "turn"
+    },
+    {
+      "id": "energy",
+      "label": "Energy",
+      "type": "progress",
+      "color": "#58a6ff",
+      "path": "progression.energy",
+      "max_path": "progression.energy_max"
+    },
+    {
+      "id": "stress",
+      "label": "Stress",
+      "type": "progress",
+      "color": "#f85149",
+      "path": "progression.stress",
+      "max_path": "progression.stress_max"
+    },
+    {
+      "id": "funds",
+      "label": "Funds",
+      "type": "text",
+      "path": "purse.display"
+    }
+  ],
+  "entity_header": {
+    "title_path": "character.name",
+    "subtitle_path": "character.archetype",
+    "tag_paths": [
+      "character.origin",
+      "character.status",
+      "character.alignment"
+    ]
+  },
+  "status_sections": {
+    "progression_bars": {
+      "title": "Vitals & Resource Pools",
+      "bars": [
+        {
+          "label": "Energy Reserves",
+          "path": "progression.energy",
+          "max_path": "progression.energy_max",
+          "color": "#58a6ff"
+        },
+        {
+          "label": "Stress Level",
+          "path": "progression.stress",
+          "max_path": "progression.stress_max",
+          "color": "#f85149"
+        }
+      ]
+    },
+    "stat_grid": {
+      "title": "Assets & Counters",
+      "boxes": [
+        {
+          "label": "Available Funds",
+          "path": "purse.display"
+        },
+        {
+          "label": "Checkpoints",
+          "path": "progression.checkpoint_tokens",
+          "suffix": "/ 5"
+        },
+        {
+          "label": "Reputation",
+          "path": "character.reputation"
+        },
+        {
+          "label": "Key Asset",
+          "path": "character.special_trait"
+        }
+      ]
+    },
+    "attributes_grid": {
+      "title": "Core Competencies (1-100 Scale)",
+      "dict_path": "competencies",
+      "max_scale": 100
+    },
+    "scene_anchor": {
+      "title": "Immediate Scene Coordinates",
+      "location_path": "scene_anchor.location",
+      "context_path": "scene_anchor.context",
+      "time_path": "scene_anchor.time"
+    }
+  },
+  "sidebar": {
+    "tabs": [
+      {
+        "id": "status-tab",
+        "label": "Dossier",
+        "source": "GAMEPLAY/status.md",
+        "json_source": "GAMEPLAY/status.json"
+      },
+      {
+        "id": "relations-tab",
+        "label": "Social Web",
+        "source": "GAMEPLAY/relations.md"
+      },
+      {
+        "id": "items-tab",
+        "label": "Inventory",
+        "source": "GAMEPLAY/items.md"
+      },
+      {
+        "id": "world-tab",
+        "label": "World Lore",
+        "type": "lore_browser"
+      }
+    ]
+  }
+}

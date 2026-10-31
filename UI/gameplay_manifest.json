@@ -1,0 +1,105 @@
+{
+  "template_campaign": {
+    "status": "# CURRENT PUBLIC STATE\n\n## Scene\n\n- **Turn:** 1\n- **Timeline:** Act I — Dawn of Chapter One\n- **Location:** Sub-Level 4 Staging Room, Terminal Bay A\n- **Situation:** A contract offer is awaiting a decision before its deadline advances.\n\n## Public Conditions\n\n- **Energy:** 100 / 100\n- **Stress:** 10 / 100\n- **Funds:** 500 ₡\n- **Known pressure:** Contract deadline — 0 / 4\n- **Suspected pressure:** Rival interest — 0 / 6\n\n## Open Threads\n\n- Decide whether to accept the first contract.\n",
+    "relations": "# PUBLIC RELATIONSHIPS\n\n## Key Contacts\n\n- **Handler Cross** — Contract Coordinator. Professional / transactional. Supplies mission parameters and logistics support.\n",
+    "items": "# PUBLIC INVENTORY\n\n- **Funds:** 500 ₡\n- **Equipped:** Multi-Spectrum Optical Scanner — operational.\n",
+    "upcoming_hooks": "# IMMEDIATE PUBLIC HOOKS\n\n1. Accept a risky entry route before the contract deadline worsens.\n2. Spend time investigating the data packet and accept that the contract may change.\n3. Seek a contact before committing, trading speed for better information.\n",
+    "status_json": {
+      "schema_version": 2,
+      "campaign_id": "template_campaign",
+      "turn": 1,
+      "timeline": "Act I — Dawn of Chapter One",
+      "character": {
+        "name": "Alex Mercer",
+        "archetype": "Independent Specialist",
+        "origin": "Metro Core",
+        "status": "Active Agent",
+        "alignment": "Pragmatic Neutral",
+        "reputation": "Rising",
+        "special_trait": "Rapid Adaptive Learning"
+      },
+      "progression": {
+        "energy": 100,
+        "energy_max": 100,
+        "stress": 10,
+        "stress_max": 100,
+        "checkpoint_tokens": 5,
+        "checkpoint_max": 5
+      },
+      "purse": {
+        "credits": 500,
+        "display": "500 ₡"
+      },
+      "competencies": {
+        "analysis": 35,
+        "negotiation": 30,
+        "covert_operations": 25,
+        "technical_aptitude": 28
+      },
+      "public_state": {
+        "flags": {},
+        "conditions": [],
+        "open_threads": [
+          "Decide whether to accept the first contract."
+        ]
+      },
+      "clocks": [
+        {
+          "id": "contract_deadline",
+          "label": "Contract deadline",
+          "current": 0,
+          "max": 4,
+          "visibility": "known",
+          "advance_trigger": "Time passes without a decision."
+        },
+        {
+          "id": "rival_interest",
+          "label": "Rival interest",
+          "current": 0,
+          "max": 6,
+          "visibility": "suspected",
+          "advance_trigger": "The protagonist creates public attention."
+        }
+      ],
+      "scene_anchor": {
+        "location": "Sub-Level 4 Staging Room, Terminal Bay A",
+        "context": "Briefing datapad activated; first contract terms displayed awaiting agent confirmation.",
+        "time": "06:00 Local Cycle"
+      }
+    },
+    "relations_json": {
+      "campaign_id": "template_campaign",
+      "key_contacts": [
+        {
+          "name": "Handler Cross",
+          "role": "Contract Coordinator",
+          "standing": "Professional / Transactional",
+          "status": "Primary Contact",
+          "notes": "Supplies mission parameters and logistics support."
+        }
+      ]
+    },
+    "items_json": {
+      "campaign_id": "template_campaign",
+      "purse": {
+        "display": "500 ₡",
+        "credits": 500
+      },
+      "equipped": [
+        {
+          "name": "Multi-Spectrum Optical Scanner",
+          "slot": "Headwear / Visor",
+          "condition": "100% Operational",
+          "specs": "Thermal, electromagnetic, and acoustic overlay."
+        }
+      ]
+    },
+    "active_turns": [
+      {
+        "name": "turn_0001.md",
+        "content": "# Turn 1\n\n## Situation & Initial Prompt\nThe green terminal light flickers to life on the brushed aluminum table. Outside the heavy blast glass, the early morning rain sweeps across the neon-lit towers of the central district. A sealed encrypted data packet hums beside your scanner, awaiting your authorization.\n\nHandler Cross's filtered voice chimes over the comm. \"The board is set, Alex. You have three viable entry vectors for the morning infiltration. Every ten minutes you wait, the client gets colder and the archive gets harder.\"\n\n---\n\n[OPTIONS & TYPABLE REFERENCE]\n1. Accept Contract Alpha: Infiltrate through the rooftop ventilation ducts. [Cost: exposure to weather and a fall-risk route]\n2. Accept Contract Beta: Pose as a courier at the main lobby. [Cost: forged identity is consumed if challenged]\n3. Delay entry to scan the data packet. [Cost: advance Contract Deadline by 1]\n\n[SYS: Turn 1 | Energy 100/100 | Stress 10/100 | Funds: 500 ₡ | Contract Deadline 0/4 | Checkpoints: 5/5]\n"
+      }
+    ],
+    "narrative_steering": "# GM-PRIVATE CONDITIONAL PRESSURES\n\n> This file is never player-facing. It contains possibilities, not a scripted plot.\n\n## Pressure map\n\n- If the contract deadline fills, the client withdraws the original offer and the archive tightens security.\n- If Alex creates public attention during the infiltration, advance the private rival-interest pressure and introduce evidence of surveillance later.\n- If Alex investigates before entering, reveal a credible complication but do not decide its ultimate cause until play establishes it.\n"
+  }
+}

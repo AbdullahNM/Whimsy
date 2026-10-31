@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#121519">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Whimsy — CYOA Engine</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="apple-touch-icon" href="icon-512.png">
+</head>
+<body>
+  <div id="app">
+    <!-- Top Bar -->
+    <header id="top-bar">
+      <div class="header-left">
+        <button id="toggle-sidebar-btn" class="icon-btn" title="Toggle Sidebar">☰</button>
+        <select id="campaign-select" class="campaign-dropdown">
+          <option value="template_campaign" selected>TEMPLATE CAMPAIGN</option>
+        </select>
+        <span id="sync-status" class="status-pill status-disconnected">No Folder Selected</span>
+      </div>
+      <div class="header-right" id="top-metrics-container">
+        <span class="metric-pill" id="metric-pill-turn">Turn: <strong id="val-turn">—</strong></span>
+        <span class="metric-pill" id="metric-pill-xp">XP: <strong id="val-xp">—</strong></span>
+        <span class="metric-pill" id="metric-pill-strain">Strain: <strong id="val-strain">—</strong></span>
+        <span class="metric-pill" id="metric-pill-purse">Purse: <strong id="val-purse">—</strong></span>
+      </div>
+      <div class="header-controls">
+        <button id="folder-picker-btn" class="action-btn">📂 Select Workspace</button>
+        <button id="settings-btn" class="icon-btn" title="Settings / API Key">⚙</button>
+      </div>
+    </header>
+
+    <!-- Main Container -->
+    <div id="main-container">
+      <!-- Collapsible & Resizable/Expandable Sidebar -->
+      <aside id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-tabs">
+            <button class="tab-btn active" data-tab="status-tab">Status</button>
+            <button class="tab-btn" data-tab="relations-tab">Relations</button>
+            <button class="tab-btn" data-tab="items-tab">Inventory</button>
+            <button class="tab-btn" data-tab="ontology-tab">Lineages</button>
+            <button class="tab-btn" data-tab="world-tab">World Bible</button>
+          </div>
+          <button id="expand-sidebar-btn" class="icon-btn-small" title="Expand / Shrink Sidebar">⤢</button>
+        </div>
+
+        <div class="sidebar-content">
+          <!-- Status Tab: Structured, High-Readability Card -->
+          <div id="status-tab" class="tab-pane active">
+            <div id="status-render">
+              <!-- Dynamically populated from campaign schema & status.json -->
+            </div>
+          </div>
+
+          <!-- Relations Tab -->
+          <div id="relations-tab" class="tab-pane">
+            <div id="relations-render" class="markdown-body">
+              <div class="relation-card mentor">
+                <div class="rel-name">Handler Cross <span class="rel-tag">Primary Contact</span></div>
+                <div class="rel-desc">Contract coordinator. Supplies mission parameters and logistics support.</div>
+              </div>
+              <div class="relation-card">
+                <div class="rel-name">Alex Mercer <span class="rel-tag">Protagonist</span></div>
+                <div class="rel-desc">Independent specialist operating under the current contract.</div>
+              </div>
+              <div class="relation-card warning">
+                <div class="rel-name">Rival Interest <span class="rel-tag">Unknown Party</span></div>
+                <div class="rel-desc">A competitor tracking the same objective. Identity and reach unknown.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Inventory Tab -->
+          <div id="items-tab" class="tab-pane">
+            <div id="items-render" class="markdown-body">
+              <div class="inventory-section">
+                <h4>Equipped Gear</h4>
+                <div class="item-card highlight">
+                  <div class="item-title">Multi-Spectrum Optical Scanner</div>
+                  <div class="item-desc">Headwear / Visor. Thermal, electromagnetic, and acoustic overlay. 100% operational.</div>
+                </div>
+              </div>
+
+              <div class="inventory-section">
+                <h4>Resources</h4>
+                <ul class="catalyst-list">
+                  <li><span class="check">✓</span> <strong>500 credits</strong> (purse)</li>
+                  <li><span class="check">✓</span> <strong>Standard field kit</strong> (restocked on success)</li>
+                </ul>
+              </div>
+
+              <div class="inventory-section">
+                <h4>Charters, Keys & Passes</h4>
+                <ul class="document-list">
+                  <li><strong>Standard Contract Charter</strong> (current engagement)</li>
+                  <li><strong>Terminal Bay A Access Pass</strong> (staging area)</li>
+                  <li><strong>Archive Entry Permit</strong> (restricted records vault)</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- Lineages & Kinship Tab -->
+          <div id="ontology-tab" class="tab-pane">
+            <div id="ontology-render" class="markdown-body">
+              <!-- Dynamically populated from ontology.json & prominent_houses_and_clans.md -->
+            </div>
+          </div>
+
+          <!-- World Bible Tab -->
+          <div id="world-tab" class="tab-pane">
+            <div class="lore-browser">
+              <select id="lore-category-select">
+                <option value="CORE">CORE (Rules & Systems)</option>
+                <option value="PLACES">PLACES (Locations & Architecture)</option>
+                <option value="PEOPLE">PEOPLE (Characters)</option>
+                <option value="FACTIONS">FACTIONS (Organisations & Powers)</option>
+                <option value="GUIDES">GUIDES (Turn Rules & Schemas)</option>
+              </select>
+              <div id="lore-article-list" class="lore-pills"></div>
+              <div id="lore-article-content" class="markdown-body">Select a category and article to view.</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Narrative Viewport -->
+      <main id="story-viewport">
+        <div id="story-stream">
+          <!-- Welcome Initial Card -->
+          <div class="scene-card welcome-card">
+            <div class="turn-header">Prologue • Staging Area</div>
+            <h2>New Campaign Adventure</h2>
+            <p>Connect a campaign workspace to begin, or use the bundled template campaign as a starting point.</p>
+            <p>The template provides a complete, genre-agnostic scaffold: gameplay state, a modular world bible, and a rolling turn log.</p>
+            <p>Use the 📂 Select Workspace button to load an existing campaign folder.</p>
+          </div>
+        </div>
+
+        <!-- Fixed Bottom Action Dock -->
+        <footer id="action-dock">
+          <!-- Choice Grid -->
+          <div id="choice-buttons-container" class="choice-grid">
+            <button class="choice-btn" data-choice="1">
+              <span class="choice-num">1.</span>
+              <span class="choice-desc">Press forward along your primary path.</span>
+            </button>
+            <button class="choice-btn" data-choice="2">
+              <span class="choice-num">2.</span>
+              <span class="choice-desc">Inspect your immediate environment for hidden clues or resources.</span>
+            </button>
+            <button class="choice-btn" data-choice="3">
+              <span class="choice-num">3.</span>
+              <span class="choice-desc">Confer with your companions to consolidate strategy.</span>
+            </button>
+            <button class="choice-btn" data-choice="4">
+              <span class="choice-num">4.</span>
+              <span class="choice-desc">Rest and recover your somatic vitals before proceeding.</span>
+            </button>
+          </div>
+
+          <!-- Dedicated RECAL Section -->
+          <div class="recal-dock-section">
+            <!-- Active Recalibration Chip (Populated when active in SYS block) -->
+            <div id="active-recal-banner" class="active-recal-chip hidden">
+              <span class="recal-chip-icon">🎯</span>
+              <span class="recal-chip-label">Active Recal:</span>
+              <span id="active-recal-text" class="recal-chip-text"></span>
+              <span id="active-recal-expires" class="recal-chip-expires"></span>
+              <button id="btn-clear-recal" class="recal-clear-btn" title="Clear active recalibration">✕</button>
+            </div>
+
+            <div class="recal-label-row">
+              <span class="recal-badge">RECALIBRATION</span>
+              <span class="recal-hint">Inject custom tactical nuance, somatic focus, or roleplay constraints directly into your selected action:</span>
+            </div>
+            <div class="recal-input-row">
+              <input type="text" id="recal-input" placeholder="e.g. Describe an additional nuance or constraint for your selected action..." />
+              <button id="submit-action-btn" class="action-btn primary">Execute Choice</button>
+            </div>
+          </div>
+        </footer>
+      </main>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal-overlay hidden">
+      <div class="modal-content">
+        <h3>Campaign & Model Settings</h3>
+        <label id="gemini-key-label">
+          Gemini API Key <small style="color:var(--gold-dim)">(Only for Cloud models)</small>:
+          <input type="password" id="gemini-api-key" placeholder="AIzaSy... (optional for local)" />
+        </label>
+        <label>
+          Prose Length / Pacing:
+          <select id="pacing-select">
+            <option value="concise">Concise (1–2 punchy paragraphs, fast scene tempo)</option>
+            <option value="standard" selected>Standard (2–3 balanced, high-sensory paragraphs)</option>
+            <option value="expansive">Expansive (Full multi-paragraph scene & deep NPC dialogue)</option>
+          </select>
+        </label>
+        <label>
+          Model Target:
+          <select id="gemini-model-select">
+            <option value="local-antigravity" selected>Local Antigravity (Local Engine / Agent Bridge)</option>
+            <option value="gemini-2.5-flash">Gemini 2.5 Flash (Cloud API)</option>
+            <option value="gemini-2.5-pro">Gemini 2.5 Pro (Cloud Frontier Reasoning)</option>
+            <option value="local-endpoint">Custom Local Endpoint (Ollama / vLLM / LM Studio)</option>
+          </select>
+        </label>
+        <div id="local-endpoint-group" style="margin-top: 4px;">
+          <label>
+            Local Endpoint URL:
+            <input type="text" id="local-endpoint-url" placeholder="http://localhost:8000/generate" value="http://localhost:8000/generate" />
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button id="save-settings-btn" class="action-btn primary">Save & Close</button>
+          <button id="close-settings-btn" class="action-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

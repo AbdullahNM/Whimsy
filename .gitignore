@@ -1,0 +1,15 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.zip
+backups/
+.DS_Store
+
+# ---- Private / personal data (kept local, never published) ----
+# Only the generic template campaign ships with the repository.
+CAMPAIGNS/*
+!CAMPAIGNS/template_campaign/
+!CAMPAIGNS/template_campaign/**
+notebooklm_export/
+takeout_extracted/
