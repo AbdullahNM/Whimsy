@@ -1,5 +1,6 @@
 {
   "id": "template_campaign",
+  "operational_mode": "classic_cyoa",
   "title": "New Campaign Universe",
   "genre": "Custom CYOA Universe",
   "theme": {

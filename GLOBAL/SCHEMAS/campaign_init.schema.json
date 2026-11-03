@@ -5,6 +5,12 @@
   "type": "object",
   "required": ["id", "title", "genre", "theme", "metrics", "entity_header", "status_sections", "sidebar"],
   "properties": {
+    "operational_mode": {
+      "type": "string",
+      "enum": ["classic_cyoa", "freeform_simulation"],
+      "default": "classic_cyoa",
+      "description": "Operational interaction mode: strict choice selection ('classic_cyoa') or emergent freeform prose ('freeform_simulation')."
+    },
     "id": {
       "type": "string",
       "description": "Unique folder and campaign slug identifier (e.g. template_campaign, neon_syndicate, summer_hearts, cold_case_1947)"
