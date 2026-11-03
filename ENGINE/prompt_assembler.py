@@ -128,10 +128,171 @@ class PromptAssembler:
         except Exception as e:
             return f"=== ONTOLOGY LOAD ERROR: {str(e)} ==="
 
+    def load_world_foundation(self, campaign_name: str) -> str:
+        """
+        Loads world-first foundation specification data and formats it into
+        epistemic categories for the system prompt. Canon secrets/mysteries are
+        strictly hidden from protagonist view unless flagged as discovered.
+        """
+        candidates = [
+            os.path.join(self.campaigns_dir, campaign_name, "WORLD_FOUNDATION", "world_foundation.json"),
+            os.path.join(self.campaigns_dir, campaign_name, "world_foundation.json"),
+        ]
+        wf_path = None
+        for cand in candidates:
+            if os.path.exists(cand):
+                wf_path = cand
+                break
+
+        if not wf_path:
+            wf_dir = os.path.join(self.campaigns_dir, campaign_name, "WORLD_FOUNDATION")
+            if os.path.isdir(wf_dir):
+                jsons = sorted(glob.glob(os.path.join(wf_dir, "*.json")))
+                if jsons:
+                    wf_path = jsons[0]
+
+        # Support direct directory path passed as campaign_name
+        if not wf_path and os.path.isdir(campaign_name):
+            direct_candidates = [
+                os.path.join(campaign_name, "WORLD_FOUNDATION", "world_foundation.json"),
+                os.path.join(campaign_name, "world_foundation.json"),
+            ]
+            for cand in direct_candidates:
+                if os.path.exists(cand):
+                    wf_path = cand
+                    break
+
+        if not wf_path or not os.path.exists(wf_path):
+            return ""
+
+        try:
+            with open(wf_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            lines = ["=== WORLD FOUNDATION & EPISTEMIC SEPARATION ==="]
+
+            # 1. Immutable Facts
+            immutable_facts = data.get("immutable_facts", [])
+            if immutable_facts:
+                lines.append("\n## 1. IMMUTABLE FACTS (UNALTERABLE GROUND TRUTHS)")
+                for fact in immutable_facts:
+                    if isinstance(fact, dict):
+                        cat = fact.get("category", "General").upper()
+                        stmt = fact.get("statement") or fact.get("fact") or fact.get("description", "")
+                        f_id = fact.get("id")
+                        prefix = f"[{f_id}] [{cat}]" if f_id else f"[{cat}]"
+                        lines.append(f"- {prefix}: {stmt}")
+                    else:
+                        lines.append(f"- {fact}")
+
+            # 2. Mutable World State
+            mutable_state = data.get("mutable_world_state", {})
+            if mutable_state:
+                lines.append("\n## 2. MUTABLE WORLD STATE (DYNAMIC GEOPOLITICAL & ENVIRONMENTAL STATE)")
+                if isinstance(mutable_state, dict):
+                    if "active_epoch" in mutable_state:
+                        lines.append(f"- Active Epoch/Climate: {mutable_state['active_epoch']}")
+                    if "factions_control" in mutable_state and isinstance(mutable_state["factions_control"], dict):
+                        lines.append("- Faction Territorial & Administrative Control:")
+                        for entity, ctrl in mutable_state["factions_control"].items():
+                            lines.append(f"  * {entity}: {ctrl}")
+                    if "resource_distribution" in mutable_state and isinstance(mutable_state["resource_distribution"], dict):
+                        lines.append("- Resource Distribution & Scarcity:")
+                        for res, dist in mutable_state["resource_distribution"].items():
+                            lines.append(f"  * {res}: {dist}")
+                    if "global_tensions_index" in mutable_state:
+                        lines.append(f"- Global Tensions Index: {mutable_state['global_tensions_index']}")
+                    if "dynamic_flags" in mutable_state and isinstance(mutable_state["dynamic_flags"], dict):
+                        lines.append("- Dynamic World Flags:")
+                        for k, v in mutable_state["dynamic_flags"].items():
+                            lines.append(f"  * {k}: {v}")
+                else:
+                    lines.append(f"- {mutable_state}")
+
+            # 3. Factions & Tensions
+            factions = data.get("factions_and_tensions", [])
+            if factions:
+                lines.append("\n## 3. INDEPENDENT FACTIONS & ACTIVE TENSIONS")
+                for fac in factions:
+                    if isinstance(fac, dict):
+                        fac_name = fac.get("name", fac.get("id", "Unknown Faction"))
+                        agenda = fac.get("agenda", "")
+                        lines.append(f"- **{fac_name}**" + (f" ({agenda})" if agenda else ""))
+                        objs = fac.get("objectives", [])
+                        if objs:
+                            lines.append(f"  * Autonomous Objectives: {'; '.join(objs)}")
+                        tens = fac.get("tensions", [])
+                        if tens:
+                            for t in tens:
+                                if isinstance(t, dict):
+                                    tgt = t.get("target_entity") or t.get("target_faction_or_entity", "Unknown Target")
+                                    fric = t.get("source_of_friction", "")
+                                    intens = t.get("intensity", "unspecified")
+                                    lines.append(f"  * Tension with {tgt} [{intens}]: {fric}")
+                                else:
+                                    lines.append(f"  * Tension: {t}")
+                    else:
+                        lines.append(f"- {fac}")
+
+            # 4. NPC Epistemic Knowledge Map
+            npc_kn = data.get("npc_knowledge", {})
+            if npc_kn:
+                lines.append("\n## 4. NPC EPISTEMIC KNOWLEDGE MAP (BOUNDARIES & MISCONCEPTIONS)")
+                if isinstance(npc_kn, dict):
+                    for npc_id, kn in npc_kn.items():
+                        lines.append(f"- **{npc_id}**:")
+                        if isinstance(kn, dict):
+                            knows = kn.get("knows", [])
+                            does_not_know = kn.get("does_not_know", [])
+                            falsely_believes = kn.get("falsely_believes", [])
+                            lines.append(f"  * Verified Known Truths: {', '.join(knows) if knows else 'None'}")
+                            lines.append(f"  * Ignorant Of (Does NOT Know): {', '.join(does_not_know) if does_not_know else 'None'}")
+                            lines.append(f"  * False Beliefs (Misconceptions): {', '.join(falsely_believes) if falsely_believes else 'None'}")
+                        else:
+                            lines.append(f"  * Knowledge: {kn}")
+                elif isinstance(npc_kn, list):
+                    for item in npc_kn:
+                        lines.append(f"- {item}")
+
+            # 5. Rumors & Beliefs
+            rumors = data.get("rumors_and_beliefs", [])
+            if rumors:
+                lines.append("\n## 5. RUMORS, FOLKTALES & SUBJECTIVE BELIEFS")
+                for rum in rumors:
+                    if isinstance(rum, dict):
+                        claim = rum.get("claim", "")
+                        believed_by = rum.get("believed_by", "Common Lore")
+                        veracity = rum.get("veracity", "unverified")
+                        lines.append(f"- \"{claim}\" (Believed by: {believed_by} | Veracity: {veracity})")
+                    else:
+                        lines.append(f"- {rum}")
+
+            # 6. Unresolved Mysteries (Hidden from protagonist view unless discovered)
+            mysteries = data.get("unresolved_mysteries", [])
+            if mysteries:
+                lines.append("\n## 6. CANON SECRETS & UNRESOLVED MYSTERIES")
+                for myst in mysteries:
+                    if isinstance(myst, dict):
+                        m_title = myst.get("title", myst.get("id", "Secret"))
+                        m_truth = myst.get("secret_truth") or myst.get("truth") or myst.get("description", "")
+                        discovered = bool(myst.get("discovered", False))
+                        cond = myst.get("discovery_conditions", "In-world investigation required")
+                        if discovered:
+                            lines.append(f"- [DISCOVERED] **{m_title}**: {m_truth}")
+                        else:
+                            lines.append(f"- [HIDDEN FROM PROTAGONIST VIEW - CANON SECRET] **{m_title}**: {m_truth} (Discovery condition: {cond})")
+                    else:
+                        lines.append(f"- [HIDDEN FROM PROTAGONIST VIEW - CANON SECRET] {myst}")
+
+            return "\n".join(lines)
+        except Exception as e:
+            return f"=== WORLD FOUNDATION LOAD ERROR: {str(e)} ==="
+
     def build_system_prompt(self, campaign_name: str, active_topics: list[str] = None) -> str:
         global_rules = self.load_global_rules()
         campaign_gameplay = self.load_campaign_gameplay(campaign_name)
         campaign_ontology = self.load_campaign_ontology(campaign_name)
+        world_foundation = self.load_world_foundation(campaign_name)
         world_lore = self.load_world_bible(campaign_name, active_topics)
         narrative_ideas = self.load_campaign_ideas(campaign_name)
 
@@ -147,6 +308,10 @@ class PromptAssembler:
         if campaign_ontology:
             ontology_section = f"# 3. ONTOLOGY, KINSHIP & DISAMBIGUATION RULES\n{campaign_ontology}\n\n"
 
+        foundation_section = ""
+        if world_foundation:
+            foundation_section = f"# 3.1 WORLD FOUNDATION & EPISTEMIC BOUNDARIES\n{world_foundation}\n\n"
+
         return (
             "You are the Game Master, Rules Arbiter, and World Simulator for a Choice-driven RPG engine.\n\n"
             "# 1. GLOBAL SYSTEM CONSTRAINTS (AUTHORITATIVE & IMMUTABLE)\n"
@@ -154,6 +319,7 @@ class PromptAssembler:
             "# 2. ACTIVE CAMPAIGN GAMEPLAY & STATE\n"
             f"{campaign_gameplay}\n\n"
             f"{ontology_section}"
+            f"{foundation_section}"
             "# 4. WORLD BIBLE & RELEVANT LORE\n"
             f"{world_lore}\n\n"
             "# 5. STORY STEERING & NARRATIVE SEEDS\n"
@@ -165,4 +331,3 @@ class PromptAssembler:
 def assemble_prompt(campaign_name: str, root_dir: str = ".") -> str:
     assembler = PromptAssembler(root_dir)
     return assembler.build_system_prompt(campaign_name)
-

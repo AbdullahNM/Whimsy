@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WorldFoundationSchema",
+  "description": "Schema for world-first campaign initialization and epistemic separation: immutable facts, mutable world state, autonomous factions/tensions, NPC epistemic knowledge maps, subjective rumors/beliefs, and unresolved canon mysteries.",
+  "type": "object",
+  "required": [
+    "campaign_id",
+    "schema_version",
+    "immutable_facts",
+    "mutable_world_state",
+    "factions_and_tensions",
+    "npc_knowledge",
+    "rumors_and_beliefs",
+    "unresolved_mysteries"
+  ],
+  "properties": {
+    "campaign_id": {
+      "type": "string",
+      "description": "Unique campaign slug identifier"
+    },
+    "schema_version": {
+      "type": "string",
+      "description": "Semantic versioning of the world foundation specification"
+    },
+    "world_name": {
+      "type": "string",
+      "description": "Formal setting or universe name"
+    },
+    "overview": {
+      "type": "string",
+      "description": "High-level overview of the world foundation and its autonomous dynamics"
+    },
+    "immutable_facts": {
+      "type": "array",
+      "description": "Foundational truths of history, geography, natural laws that cannot be rewritten.",
+      "items": {
+        "type": "object",
+        "required": ["id", "category", "statement"],
+        "properties": {
+          "id": { "type": "string" },
+          "category": {
+            "type": "string",
+            "enum": ["history", "geography", "natural_laws", "metaphysics", "cosmology"]
+          },
+          "statement": { "type": "string" },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    "mutable_world_state": {
+      "type": "object",
+      "description": "Current dynamic state of factions, resources, control.",
+      "required": ["factions_control", "resource_distribution", "active_epoch"],
+      "properties": {
+        "active_epoch": {
+          "type": "string",
+          "description": "Current era, season, political climate, or macro timeline state"
+        },
+        "factions_control": {
+          "type": "object",
+          "description": "Dynamic territorial, jurisdictional, or administrative control mapping"
+        },
+        "resource_distribution": {
+          "type": "object",
+          "description": "Current availability, scarcity, and supply choke points across the setting"
+        },
+        "global_tensions_index": {
+          "type": "string",
+          "description": "Aggregate macro tension level across the setting"
+        },
+        "dynamic_flags": {
+          "type": "object",
+          "description": "World-level boolean or scalar flags tracking emerging geopolitical events"
+        }
+      }
+    },
+    "factions_and_tensions": {
+      "type": "array",
+      "description": "Independent faction objectives, active geopolitical / civic tensions.",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "objectives", "tensions"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "agenda": { "type": "string" },
+          "objectives": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Independent faction goals that progress autonomously regardless of protagonist intervention"
+          },
+          "tensions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["target_entity", "source_of_friction", "intensity"],
+              "properties": {
+                "target_entity": { "type": "string" },
+                "source_of_friction": { "type": "string" },
+                "intensity": {
+                  "type": "string",
+                  "enum": ["cold", "simmering", "escalating", "open_conflict"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "npc_knowledge": {
+      "type": "object",
+      "description": "Map of what specific canon NPCs know, don't know, or falsely believe.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["knows", "does_not_know", "falsely_believes"],
+        "properties": {
+          "knows": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Factual truths verified in canon known to this NPC"
+          },
+          "does_not_know": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Known unknowns and information this NPC is completely ignorant of"
+          },
+          "falsely_believes": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Active misconceptions, biases, or false propaganda accepted as true by this NPC"
+          }
+        }
+      }
+    },
+    "rumors_and_beliefs": {
+      "type": "array",
+      "description": "Unverified claims, folktales, biased viewpoints.",
+      "items": {
+        "type": "object",
+        "required": ["id", "claim", "believed_by", "veracity"],
+        "properties": {
+          "id": { "type": "string" },
+          "claim": { "type": "string" },
+          "believed_by": { "type": "string" },
+          "veracity": {
+            "type": "string",
+            "enum": ["verified_false", "partially_true", "exaggerated", "unverified"]
+          },
+          "origin": { "type": "string" }
+        }
+      }
+    },
+    "unresolved_mysteries": {
+      "type": "array",
+      "description": "Canon secrets that must remain unresolved until justified in-world discovery.",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "secret_truth"],
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "secret_truth": { "type": "string" },
+          "discovered": { "type": "boolean" },
+          "discovery_conditions": { "type": "string" }
+        }
+      }
+    }
+  }
+}
