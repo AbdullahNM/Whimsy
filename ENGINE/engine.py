@@ -24,6 +24,7 @@ sys.path.insert(0, ROOT_DIR)
 
 from ENGINE.prompt_assembler import PromptAssembler
 from ENGINE.state_parser import StateParser
+from ENGINE.mode_validator import validate_action, get_campaign_mode
 
 PORT = int(os.environ.get("ANTIGRAVITY_PORT", 8000))
 
@@ -79,6 +80,27 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
             campaign = payload.get("campaign", "")
             pacing = payload.get("pacing", "standard")
             turn_num = payload.get("currentTurn", 1)
+
+            # Resolve operational mode and validate action
+            mode = payload.get("operational_mode") or payload.get("mode")
+            if not mode:
+                mode = get_campaign_mode(campaign, ROOT_DIR)
+
+            is_valid, error_msg, parsed_action = validate_action(
+                action=player_action,
+                mode=mode,
+                campaign_id=campaign,
+                root_dir=ROOT_DIR
+            )
+
+            if not is_valid:
+                self._set_cors_headers(400)
+                self.wfile.write(json.dumps({
+                    "error": "INVALID_ACTION",
+                    "message": error_msg,
+                    "mode": mode
+                }).encode("utf-8"))
+                return
 
             response_text = self.generate_turn(campaign, player_action, pacing, turn_num, payload)
 

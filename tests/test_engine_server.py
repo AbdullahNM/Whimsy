@@ -100,7 +100,7 @@ class TestEngineServer(unittest.TestCase):
 
     def test_generate_post_valid_payload(self):
         payload = {
-            "action": "Accept the contract and head to the staging bay",
+            "action": "1",
             "campaign": "template_campaign",
             "pacing": "standard",
             "currentTurn": 245,
