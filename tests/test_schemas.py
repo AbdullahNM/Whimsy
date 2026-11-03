@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Unit tests for schema validation.
-Validates campaign_config.json, status.json, relations.json, and items.json
-for the bundled template campaign against GLOBAL/SCHEMAS/*.
+Validates campaign_config.json, status.json, relations.json, items.json,
+and world_foundation.json for the bundled template campaign against GLOBAL/SCHEMAS/*.
 """
 
 import os
@@ -66,9 +66,14 @@ class SimpleSchemaValidator:
                     errors.append(f"{path}: missing required property '{req}'")
 
             properties = schema.get("properties", {})
+            additional_props = schema.get("additionalProperties")
             for key, val in data.items():
                 if key in properties:
                     errors.extend(cls.validate(val, properties[key], f"{path}.{key}"))
+                elif isinstance(additional_props, dict):
+                    errors.extend(cls.validate(val, additional_props, f"{path}.{key}"))
+                elif additional_props is False:
+                    errors.append(f"{path}: additional property '{key}' not allowed")
 
         # 5. Array items validation
         if isinstance(data, list) and "items" in schema:
@@ -87,6 +92,8 @@ class TestSchemas(unittest.TestCase):
             cls.campaign_init_schema = json.load(f)
         with open(os.path.join(cls.schemas_dir, "turn_state.schema.json"), "r") as f:
             cls.turn_state_schema = json.load(f)
+        with open(os.path.join(cls.schemas_dir, "world_foundation.schema.json"), "r") as f:
+            cls.world_foundation_schema = json.load(f)
 
     def _load_json(self, rel_path: str) -> dict:
         full_path = os.path.join(ROOT_DIR, rel_path)
@@ -109,6 +116,14 @@ class TestSchemas(unittest.TestCase):
         self.assertEqual(errors, [], f"Template status.json schema errors: {errors}")
         self.assertEqual(status["campaign_id"], "template_campaign")
         self.assertGreaterEqual(status["turn"], 1)
+
+    # --- World Foundation Schema Tests ---
+
+    def test_template_world_foundation_json(self):
+        wf = self._load_json("CAMPAIGNS/template_campaign/WORLD_FOUNDATION/world_foundation.json")
+        errors = SimpleSchemaValidator.validate(wf, self.world_foundation_schema)
+        self.assertEqual(errors, [], f"Template world_foundation schema errors: {errors}")
+        self.assertEqual(wf["campaign_id"], "template_campaign")
 
     # --- Relations and Items JSON Integrity Tests ---
 
@@ -153,6 +168,15 @@ class TestSchemas(unittest.TestCase):
         }
         errors = SimpleSchemaValidator.validate(bad_status, self.turn_state_schema)
         self.assertTrue(any("less than minimum" in e for e in errors))
+
+    def test_negative_invalid_world_foundation_missing_required(self):
+        bad_wf = {
+            "campaign_id": "bad_campaign",
+            "schema_version": "1.0.0"
+        }
+        errors = SimpleSchemaValidator.validate(bad_wf, self.world_foundation_schema)
+        self.assertTrue(any("missing required property 'immutable_facts'" in e for e in errors))
+        self.assertTrue(any("missing required property 'npc_knowledge'" in e for e in errors))
 
 
 if __name__ == "__main__":

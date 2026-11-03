@@ -9,11 +9,12 @@ The CYOA story engine is completely **genre-agnostic**. The core runtime does no
 │                      CAMPAIGN INITIALIZATION SPEC                      │
 ├────────────────────────────────┬───────────────────────────────────────┤
 │ 1. campaign_config.json        │ Theme, Metrics, Badge, Tabs, Sections │
-│ 2. GAMEPLAY/status.json        │ Deterministic Living Machine State    │
-│ 3. GAMEPLAY/relations.json     │ Social Web / Suspects / Factions      │
-│ 4. GAMEPLAY/items.json         │ Assets, Gear, Clues, Currency         │
-│ 5. TURNS/ACTIVE/turn_0001.md   │ Living Scene Narrative & First Prompt │
-│ 6. clocks + public_state        │ Stakes, pressures, known consequences │
+│ 2. WORLD_FOUNDATION/           │ Epistemic Ground Truth & World State  │
+│ 3. GAMEPLAY/status.json        │ Deterministic Living Machine State    │
+│ 4. GAMEPLAY/relations.json     │ Social Web / Suspects / Factions      │
+│ 5. GAMEPLAY/items.json         │ Assets, Gear, Clues, Currency         │
+│ 6. TURNS/ACTIVE/turn_0001.md   │ Living Scene Narrative & First Prompt │
+│ 7. clocks + public_state        │ Stakes, pressures, known consequences │
 └────────────────────────────────┴───────────────────────────────────────┘
 ```
 
@@ -37,6 +38,9 @@ Every campaign directory under `CAMPAIGNS/<campaign_id>/` must provide the follo
 CAMPAIGNS/<campaign_id>/
 ├── campaign_config.json            # Authoritative UI & theme specification
 ├── CONFIG.yaml                     # Engine parameters (model, temperature, turn window)
+├── ontology.json                   # Character registry, family trees, and anti-collision rules
+├── WORLD_FOUNDATION/               # World-first foundation & epistemic separation
+│   └── world_foundation.json       # Immutable facts, mutable world state, factions, NPC knowledge, mysteries
 ├── GAMEPLAY/
 │   ├── status.json                 # Machine vitals matching campaign_config.json paths
 │   ├── status.md                   # Human-readable Markdown record
@@ -64,6 +68,26 @@ CAMPAIGNS/<campaign_id>/
 Every new campaign begins with one visible scene clock and one visible or suspected arc clock in `status.json`. Each meaningful turn must update a resource, clock, relationship, public flag, available hook, scene, or time. Routine moments should be grouped into macro turns rather than padded into separate choices.
 
 Roadmaps are conditional pressure maps. They may describe what an NPC or faction will do if ignored, but never prescribe the player's eventual decision, success, romance, or discovery.
+
+## 2.2 World-First Campaign Initialization and Epistemic Separation Protocol
+
+Under the World-First architecture, campaigns can be fully initialized and playable **without a predetermined protagonist storyline**. The setting exists as an autonomous, persistent dynamic simulation before any protagonist chooses an arc or takes an action.
+
+### Core Principles
+
+1. **Protagonist-Agnostic World Initialization**:
+   - The setting is not merely a backdrop spawned when the protagonist arrives; it possesses active history, ongoing conflicts, resource scarcities, and autonomous faction agendas.
+   - Campaigns can be fully initialized and playable in emergent sandbox mode or player-centric mode without requiring a scripted protagonist destiny or rail-roaded storyline.
+   - Independent faction objectives progress and active geopolitical or civic tensions simmer or escalate based on internal world logic, regardless of protagonist intervention.
+
+2. **Strict Epistemic Separation**:
+   To prevent narrative hallucination, metagaming, and canonical drift, the engine enforces strict epistemic separation defined in [`GLOBAL/SCHEMAS/world_foundation.schema.json`](GLOBAL/SCHEMAS/world_foundation.schema.json):
+   - **`immutable_facts`**: Foundational truths of history, geography, natural laws, and metaphysics that cannot be rewritten, retconned, or hallucinated by the GM or player.
+   - **`mutable_world_state`**: Current dynamic state of factions, resources, territorial control, and macro epochs/seasons.
+   - **`factions_and_tensions`**: Independent faction objectives, autonomous goals, and active geopolitical / civic tensions between entities.
+   - **`npc_knowledge`**: Epistemic boundaries defining what specific canon NPCs know (`knows`), what they are entirely ignorant of (`does_not_know`), and what they falsely believe (`falsely_believes`). NPCs never possess GM omniscience or unearned protagonist insights.
+   - **`rumors_and_beliefs`**: Unverified claims, folktales, biased viewpoints, and street-level gossip, tracked alongside their demographic spread and factual veracity (`verified_false`, `partially_true`, `exaggerated`, `unverified`).
+   - **`unresolved_mysteries`**: Canon secrets and metaphysical revelations that remain strictly hidden (`[HIDDEN FROM PROTAGONIST VIEW - CANON SECRET]`) until clear, justified in-world discovery conditions are achieved during play.
 
 ---
 
@@ -164,7 +188,8 @@ Array of metric definitions displayed in the top bar:
 When initializing a new campaign:
 1. Copy [`CAMPAIGNS/template_campaign/`](CAMPAIGNS/) into `CAMPAIGNS/<new_id>/`.
 2. Fill out `campaign_config.json` with the genre palette, metrics, and sections.
-3. Populate `GAMEPLAY/status.json` with matching initial vitals.
-4. Populate `GAMEPLAY/relations.json` and `GAMEPLAY/items.json`.
-5. Write `TURNS/ACTIVE/turn_0001.md` containing the hook scene and choices.
-6. Refresh the client: the campaign dropdown will automatically detect and render the universe.
+3. Populate `WORLD_FOUNDATION/world_foundation.json` with immutable facts, mutable world state, faction objectives, epistemic NPC knowledge maps, rumors, and unresolved mysteries.
+4. Populate `GAMEPLAY/status.json` with matching initial vitals.
+5. Populate `GAMEPLAY/relations.json` and `GAMEPLAY/items.json`.
+6. Write `TURNS/ACTIVE/turn_0001.md` containing the hook scene and choices.
+7. Refresh the client: the campaign dropdown will automatically detect and render the universe.

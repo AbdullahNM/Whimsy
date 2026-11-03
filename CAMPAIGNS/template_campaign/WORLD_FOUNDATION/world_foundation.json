@@ -1,0 +1,138 @@
+{
+  "campaign_id": "template_campaign",
+  "schema_version": "1.0.0",
+  "world_name": "Metro Core Metropolis",
+  "overview": "A stratified, enclosed city-state operating on automated logistics, corporate transit conduits, and strict epistemic clearance tiers. Factions operate with independent agendas regardless of protagonist intervention.",
+  "immutable_facts": [
+    {
+      "id": "FACT-01",
+      "category": "geography",
+      "statement": "The Metro Core is structured into four concentric subterranean rings separated by reinforced atmospheric bulkheads.",
+      "notes": "Physical structure cannot be altered without municipal clearance."
+    },
+    {
+      "id": "FACT-02",
+      "category": "natural_laws",
+      "statement": "Atmospheric filtration grids require uninterrupted geothermal power conduits routed from Sub-Level 8.",
+      "notes": "Fundamental environmental life-support dependency."
+    },
+    {
+      "id": "FACT-03",
+      "category": "history",
+      "statement": "The Great Grid Severance occurred 42 cycles ago, cutting off the Outer Periphery from municipal life support.",
+      "notes": "Canon historical catastrophe."
+    }
+  ],
+  "mutable_world_state": {
+    "active_epoch": "Cycle 143 — Post-Severance Reconstruction & High Grid Strain",
+    "factions_control": {
+      "Central Transit Directorate": "Full administrative control of Upper Rings and rail corridors",
+      "Outer Rim Reclamation Syndicate": "De-facto governance over lower scrap quadrants",
+      "Consortium Logistics Union": "Monopoly over freight manifests and staging bays"
+    },
+    "resource_distribution": {
+      "geothermal_power": "Constrained in Outer Ring; 100% capacity in Apex Spire",
+      "clean_water": "Rationed municipal supplies; black market filtration active"
+    },
+    "global_tensions_index": "Elevated — pending contract negotiations between Transit Directorate and Reclamation Syndicate",
+    "dynamic_flags": {
+      "grid_outage_threat": true,
+      "quarantine_lifted": false
+    }
+  },
+  "factions_and_tensions": [
+    {
+      "id": "transit_directorate",
+      "name": "Central Transit Directorate",
+      "agenda": "Maintain automated rail grid authority and enforce tier clearance borders.",
+      "objectives": [
+        "Secure automated staging bays against unauthorized access",
+        "Deploy surveillance probes across transit junctions"
+      ],
+      "tensions": [
+        {
+          "target_entity": "Outer Rim Reclamation Syndicate",
+          "source_of_friction": "Jurisdictional boundary dispute over Sub-Level 4 cargo terminals",
+          "intensity": "simmering"
+        }
+      ]
+    },
+    {
+      "id": "reclamation_syndicate",
+      "name": "Outer Rim Reclamation Syndicate",
+      "agenda": "Siphon power conduits and secure unregulated freight transit for fringe colonies.",
+      "objectives": [
+        "Tap geothermal bypass lines in Sub-Level 6",
+        "Establish independent barter markets along Periphery corridors"
+      ],
+      "tensions": [
+        {
+          "target_entity": "Central Transit Directorate",
+          "source_of_friction": "Frequent impounding of salvage rigs and courier vessels",
+          "intensity": "escalating"
+        }
+      ]
+    }
+  ],
+  "npc_knowledge": {
+    "handler_cross": {
+      "knows": [
+        "Contract terms for Terminal Bay A freight assignment",
+        "Transit Directorate patrol rotation timetable for Sub-Level 4",
+        "Alex Mercer's active operational status and baseline skillset"
+      ],
+      "does_not_know": [
+        "The true payload identity inside Container Sigma-9",
+        "The Syndicate infiltrator's true alias inside Staging Logistics"
+      ],
+      "falsely_believes": [
+        "Believes the Transit Directorate has full surveillance coverage of Bay A (blind spot exists at Vent shaft 3)"
+      ]
+    },
+    "alex_mercer": {
+      "knows": [
+        "Specialist training in rapid adaptive learning and technical infiltration",
+        "Current bankroll and personal gear allotment"
+      ],
+      "does_not_know": [
+        "Handler Cross's secondary contingency instructions from the Consortium",
+        "The structural sabotage in Sub-Level 6"
+      ],
+      "falsely_believes": [
+        "Believes Terminal Bay A contract is a routine equipment transport job"
+      ]
+    }
+  },
+  "rumors_and_beliefs": [
+    {
+      "id": "RUMOR-01",
+      "claim": "Sub-Level 7 was permanently flooded with toxic coolant during the Severance to drown a rogue AI core.",
+      "believed_by": "Scavengers and freight couriers in the lower tiers",
+      "veracity": "partially_true",
+      "origin": "Decommissioning report leak 30 cycles ago"
+    },
+    {
+      "id": "RUMOR-02",
+      "claim": "The Central Transit Directorate intentionally causes power brownouts in the Periphery to control curfew compliance.",
+      "believed_by": "Outer Rim dissidents and fringe workers",
+      "veracity": "exaggerated",
+      "origin": "Underground radio broadcast"
+    }
+  ],
+  "unresolved_mysteries": [
+    {
+      "id": "MYSTERY-01",
+      "title": "The Sub-Level 8 Deep Core Protocol",
+      "secret_truth": "The geothermal tap is slowly draining an ancient pre-collapse reactor that will breach threshold in 3 years.",
+      "discovered": false,
+      "discovery_conditions": "Retrieve black-box diagnostics directly from the Sub-Level 8 primary manifold."
+    },
+    {
+      "id": "MYSTERY-02",
+      "title": "Container Sigma-9 Manifest Discrepancy",
+      "secret_truth": "The container holds an unregistered prototype neural transceiver rather than standard freight servos.",
+      "discovered": false,
+      "discovery_conditions": "Successfully slice the encrypted physical lock on Container Sigma-9 or interrogate Handler Cross under pressure."
+    }
+  ]
+}
