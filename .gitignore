@@ -13,3 +13,6 @@ CAMPAIGNS/*
 !CAMPAIGNS/template_campaign/**
 notebooklm_export/
 takeout_extracted/
+
+.worktrees/
+worktrees/
