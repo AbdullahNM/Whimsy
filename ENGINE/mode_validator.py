@@ -370,3 +370,13 @@ def validate_action(
 
     # 9. Freeform prose rejected
     return False, "Arbitrary freeform actions are not permitted in Classic CYOA mode. Please select one of the offered numbered options.", {}
+
+
+class ModeValidator:
+    """Class wrapper providing static access to mode validation and choice extraction."""
+    validate_action = staticmethod(validate_action)
+    get_campaign_mode = staticmethod(get_campaign_mode)
+    is_compound_action = staticmethod(is_compound_action)
+    extract_options_from_text = staticmethod(extract_options_from_text)
+    extract_offered_choices = staticmethod(extract_offered_choices)
+    matches_choice_text = staticmethod(matches_choice_text)
