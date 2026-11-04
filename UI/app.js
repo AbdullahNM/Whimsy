@@ -501,7 +501,52 @@ function applyActiveCampaignConfig() {
 
   // 6. Update top bar metrics from active campaign state
   extractMetrics(campaignData.status, campaignData.items, campaignData.statusJson);
+
+  // 7. Update Evolution HUD (Mode badge, Focus pill, Clock)
+  updateEvolutionHUD();
 }
+
+function updateEvolutionHUD(mode, zoom, time) {
+  // 1. Operational Mode badge
+  const modeBadge = document.getElementById('hud-mode-badge');
+  if (modeBadge) {
+    const resolvedMode = mode || (activeConfig && activeConfig.operational_mode) || 'classic_cyoa';
+    if (resolvedMode === 'freeform_simulation') {
+      modeBadge.textContent = 'Freeform Simulation';
+      modeBadge.className = 'hud-badge mode-badge mode-freeform';
+    } else {
+      modeBadge.textContent = 'Classic CYOA';
+      modeBadge.className = 'hud-badge mode-badge mode-classic';
+    }
+  }
+
+  // 2. Narrative Focus / Zoom pill
+  const focusPill = document.getElementById('hud-focus-pill');
+  if (focusPill) {
+    const rawZoom = zoom
+      || (campaignData.statusJson && campaignData.statusJson.pacing_state && campaignData.statusJson.pacing_state.zoom_level)
+      || 'detailed_scene';
+    const zoomLabels = {
+      'detailed_scene': 'Detailed Scene',
+      'short_summary': 'Summary',
+      'montage': 'Montage',
+      'time_skip': 'Time Skip'
+    };
+    focusPill.textContent = zoomLabels[rawZoom] || 'Detailed Scene';
+    focusPill.dataset.zoom = rawZoom;
+  }
+
+  // 3. In-Game Time / Simulation Clock
+  const clockEl = document.getElementById('val-clock');
+  if (clockEl) {
+    const clockTime = time
+      || (campaignData.statusJson && campaignData.statusJson.pacing_state && campaignData.statusJson.pacing_state.timeline_stamp)
+      || (campaignData.statusJson && campaignData.statusJson.scene_anchor && campaignData.statusJson.scene_anchor.time)
+      || 'Day 1, 08:00';
+    clockEl.textContent = clockTime;
+  }
+}
+
 
 // 1. Schema-Driven Status Renderer (HUD Card vs Markdown View)
 function renderSchemaDrivenStatus(statusJson, config, markdownFallback = '') {
@@ -1337,6 +1382,12 @@ async function callGeminiAPI(apiKey, playerAction, pacing) {
         throw new Error(`Local engine returned HTTP ${res.status}: ${errText}`);
       }
       const data = await res.json();
+      if (data.mode || data.zoom_level || (data.pacing_state && data.pacing_state.timeline_stamp)) {
+        updateEvolutionHUD(data.mode, data.zoom_level, data.pacing_state ? data.pacing_state.timeline_stamp : null);
+      }
+      if (data.pacing_state && campaignData.statusJson) {
+        campaignData.statusJson.pacing_state = data.pacing_state;
+      }
       return data.response || data.text || data.candidates?.[0]?.content?.parts?.[0]?.text || data.choices?.[0]?.message?.content || JSON.stringify(data);
     } catch (err) {
       throw new Error(`Local Antigravity engine is not responding at ${endpoint}.\n\n• To run locally: run \`python3 ENGINE/engine.py\` in your terminal\n• Or switch to Gemini 2.5 Flash / Pro in Settings (⚙).`);
