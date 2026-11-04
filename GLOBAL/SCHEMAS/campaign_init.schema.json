@@ -180,6 +180,36 @@
         }
       }
     },
+    "style_contract": {
+      "type": "object",
+      "description": "Configurable persistent prose style contract and degradation linter rules",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["natural_everyday_english", "archival_formal", "tactical_terse"]
+        },
+        "max_sentence_words": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "prohibited_patterns": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "ban_stem_calculus_jargon": {
+          "type": "boolean"
+        },
+        "ban_decorative_microsfx": {
+          "type": "boolean"
+        },
+        "ban_forced_cliffhangers": {
+          "type": "boolean"
+        },
+        "ban_narrator_praise": {
+          "type": "boolean"
+        }
+      }
+    },
     "sidebar": {
       "type": "object",
       "required": ["tabs"],
