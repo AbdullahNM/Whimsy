@@ -19,7 +19,7 @@ if ROOT_DIR not in sys.path:
 class SimpleSchemaValidator:
     """
     Lightweight, dependency-free validator for JSON Schema subset used in CYOA schemas.
-    Supports: type, required, properties, enum, minimum, items, additionalProperties.
+    Supports: type, required, properties, enum, minimum, maximum, items, additionalProperties.
     """
 
     @classmethod
@@ -48,10 +48,12 @@ class SimpleSchemaValidator:
                     errors.append(f"{path}: expected {expected_type}, got {type(data).__name__}")
                     return errors  # Cannot validate deeper if base type mismatches
 
-        # 2. Minimum validation for numeric
-        if isinstance(data, (int, float)) and "minimum" in schema:
-            if data < schema["minimum"]:
+        # 2. Numeric range validation
+        if isinstance(data, (int, float)) and not isinstance(data, bool):
+            if "minimum" in schema and data < schema["minimum"]:
                 errors.append(f"{path}: {data} is less than minimum {schema['minimum']}")
+            if "maximum" in schema and data > schema["maximum"]:
+                errors.append(f"{path}: {data} is greater than maximum {schema['maximum']}")
 
         # 3. Enum validation
         if "enum" in schema:
@@ -124,6 +126,16 @@ class TestSchemas(unittest.TestCase):
         errors = SimpleSchemaValidator.validate(wf, self.world_foundation_schema)
         self.assertEqual(errors, [], f"Template world_foundation schema errors: {errors}")
         self.assertEqual(wf["campaign_id"], "template_campaign")
+    def test_pacing_state_schema_valid(self):
+        status = self._load_json("CAMPAIGNS/template_campaign/GAMEPLAY/status.json")
+        self.assertIn("pacing_state", status)
+        pacing = status["pacing_state"]
+        self.assertEqual(pacing["zoom_level"], "detailed_scene")
+        self.assertEqual(pacing["narrative_intensity"], 1)
+        self.assertEqual(pacing["elapsed_time_minutes"], 0)
+        self.assertIn("scheduled_events", pacing)
+        errors = SimpleSchemaValidator.validate(status, self.turn_state_schema)
+        self.assertEqual(errors, [])
 
     # --- Relations and Items JSON Integrity Tests ---
 
@@ -177,6 +189,58 @@ class TestSchemas(unittest.TestCase):
         errors = SimpleSchemaValidator.validate(bad_wf, self.world_foundation_schema)
         self.assertTrue(any("missing required property 'immutable_facts'" in e for e in errors))
         self.assertTrue(any("missing required property 'npc_knowledge'" in e for e in errors))
+    def test_negative_invalid_pacing_zoom_level(self):
+        bad_status = {
+            "schema_version": 2,
+            "campaign_id": "bad_campaign",
+            "turn": 1,
+            "timeline": "Cycle 1",
+            "progression": {"checkpoint_tokens": 5, "checkpoint_max": 5},
+            "scene_anchor": {"location": "Void", "context": "None", "time": "Never"},
+            "public_state": {"flags": {}, "conditions": [], "open_threads": []},
+            "clocks": [],
+            "pacing_state": {
+                "zoom_level": "instant_teleport_mode"
+            }
+        }
+        errors = SimpleSchemaValidator.validate(bad_status, self.turn_state_schema)
+        self.assertTrue(any("not in enum" in e for e in errors))
+
+    def test_negative_invalid_pacing_intensity_out_of_range(self):
+        bad_status = {
+            "schema_version": 2,
+            "campaign_id": "bad_campaign",
+            "turn": 1,
+            "timeline": "Cycle 1",
+            "progression": {"checkpoint_tokens": 5, "checkpoint_max": 5},
+            "scene_anchor": {"location": "Void", "context": "None", "time": "Never"},
+            "public_state": {"flags": {}, "conditions": [], "open_threads": []},
+            "clocks": [],
+            "pacing_state": {
+                "narrative_intensity": 6
+            }
+        }
+        errors = SimpleSchemaValidator.validate(bad_status, self.turn_state_schema)
+        self.assertTrue(any("greater than maximum" in e for e in errors))
+
+    def test_negative_invalid_pacing_scheduled_event_missing_required(self):
+        bad_status = {
+            "schema_version": 2,
+            "campaign_id": "bad_campaign",
+            "turn": 1,
+            "timeline": "Cycle 1",
+            "progression": {"checkpoint_tokens": 5, "checkpoint_max": 5},
+            "scene_anchor": {"location": "Void", "context": "None", "time": "Never"},
+            "public_state": {"flags": {}, "conditions": [], "open_threads": []},
+            "clocks": [],
+            "pacing_state": {
+                "scheduled_events": [
+                    {"id": "missing_time"}
+                ]
+            }
+        }
+        errors = SimpleSchemaValidator.validate(bad_status, self.turn_state_schema)
+        self.assertTrue(any("missing required property" in e for e in errors))
 
 
 if __name__ == "__main__":
