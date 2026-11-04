@@ -59,5 +59,30 @@
     "location": "Sub-Level 4 Staging Room, Terminal Bay A",
     "context": "Briefing datapad activated; first contract terms displayed awaiting agent confirmation.",
     "time": "06:00 Local Cycle"
+  },
+  "pacing_state": {
+    "scene_type": "exploration",
+    "scene_objective": "Review initial contract terms on briefing datapad.",
+    "narrative_intensity": 1,
+    "zoom_level": "detailed_scene",
+    "elapsed_time_minutes": 0,
+    "timeline_stamp": "06:00 Local Cycle",
+    "active_conflicts": [],
+    "unresolved_intentions": [
+      "Decide whether to accept the first contract."
+    ],
+    "current_location": "Sub-Level 4 Staging Room, Terminal Bay A",
+    "pending_decisions": [
+      "Accept or reject the contract offer."
+    ],
+    "pacing_profile": "balanced",
+    "scheduled_events": [
+      {
+        "id": "contract_expiry_alert",
+        "trigger_time_minutes": 240,
+        "description": "Quartermaster alerts that the contract offer window has closed.",
+        "fired": false
+      }
+    ]
   }
 }

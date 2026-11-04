@@ -142,6 +142,107 @@
     },
     "transaction_id": {
       "type": "string"
+    },
+    "pacing_state": {
+      "type": "object",
+      "description": "Persistent adaptive narrative focus and pacing controller state.",
+      "properties": {
+        "scene_type": {
+          "type": "string",
+          "description": "Current narrative scene type (e.g. conversation, conflict, exploration, downtime, travel, routine)."
+        },
+        "scene_objective": {
+          "type": "string",
+          "description": "Immediate tactical or narrative goal of the scene."
+        },
+        "narrative_intensity": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Narrative intensity level from 1 (quiet/routine) to 5 (life-or-death/climax)."
+        },
+        "zoom_level": {
+          "type": "string",
+          "enum": [
+            "detailed_scene",
+            "short_summary",
+            "montage",
+            "time_skip"
+          ],
+          "description": "Camera focal depth and time resolution."
+        },
+        "elapsed_time_minutes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Explicit total in-game elapsed time in minutes."
+        },
+        "timeline_stamp": {
+          "type": "string",
+          "description": "Diegetic calendar or clock timestamp."
+        },
+        "active_conflicts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of active immediate conflicts."
+        },
+        "unresolved_intentions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Player declarations or scene intentions that have not yet reached closure."
+        },
+        "current_location": {
+          "type": "string",
+          "description": "Current diegetic location of the protagonist."
+        },
+        "pending_decisions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Immediate forks or choices requiring resolution."
+        },
+        "pacing_profile": {
+          "type": "string",
+          "enum": [
+            "slow",
+            "balanced",
+            "fast"
+          ],
+          "description": "Macro progression pacing profile."
+        },
+        "scheduled_events": {
+          "type": "array",
+          "description": "Clock events scheduled to fire at specific elapsed time thresholds.",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "trigger_time_minutes",
+              "description",
+              "fired"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "trigger_time_minutes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "description": {
+                "type": "string"
+              },
+              "fired": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
     }
   }
 }
