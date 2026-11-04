@@ -104,6 +104,15 @@
         "time_path": "scene_anchor.time"
       }
     },
+    "style_contract": {
+      "mode": "natural_everyday_english",
+      "max_sentence_words": 35,
+      "prohibited_patterns": [],
+      "ban_stem_calculus_jargon": true,
+      "ban_decorative_microsfx": true,
+      "ban_forced_cliffhangers": true,
+      "ban_narrator_praise": true
+    },
     "sidebar": {
       "tabs": [
         {
