@@ -27,6 +27,28 @@ class PromptAssembler:
                 return f"=== STATE: PUBLIC_LEDGER ===\n{f.read()}"
         return ""
 
+    def load_campaign_agents_directives(self, campaign_name: str) -> str:
+        agents_path = os.path.join(self.campaigns_dir, campaign_name, "AGENTS.md")
+        if not os.path.exists(agents_path) and os.path.isdir(campaign_name):
+            agents_path = os.path.join(campaign_name, "AGENTS.md")
+        if os.path.exists(agents_path):
+            with open(agents_path, "r", encoding="utf-8") as f:
+                return f"=== CAMPAIGN DIRECTIVES & PROGRESSION DOCTRINE: AGENTS.MD ===\n{f.read()}"
+        return ""
+
+    def load_campaign_config(self, campaign_name: str) -> str:
+        cfg_path = os.path.join(self.campaigns_dir, campaign_name, "campaign_config.json")
+        if not os.path.exists(cfg_path) and os.path.isdir(campaign_name):
+            cfg_path = os.path.join(campaign_name, "campaign_config.json")
+        if os.path.exists(cfg_path):
+            try:
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                return f"=== CAMPAIGN CONFIGURATION & METRICS ===\n{json.dumps(cfg, indent=2)}"
+            except Exception:
+                pass
+        return ""
+
     def load_campaign_gameplay(self, campaign_name: str) -> str:
         gameplay_dir = os.path.join(self.campaigns_dir, campaign_name, "GAMEPLAY")
         if not os.path.exists(gameplay_dir):
@@ -291,6 +313,8 @@ class PromptAssembler:
     def build_system_prompt(self, campaign_name: str, active_topics: list[str] = None) -> str:
         global_rules = self.load_global_rules()
         campaign_gameplay = self.load_campaign_gameplay(campaign_name)
+        campaign_directives = self.load_campaign_agents_directives(campaign_name)
+        campaign_config = self.load_campaign_config(campaign_name)
         campaign_ontology = self.load_campaign_ontology(campaign_name)
         world_foundation = self.load_world_foundation(campaign_name)
         world_lore = self.load_world_bible(campaign_name, active_topics)
@@ -303,6 +327,14 @@ class PromptAssembler:
         if active_turns:
             turn_blocks = [f"=== RECENT TURN: {t['file']} ===\n{t['content']}" for t in active_turns]
             turns_text = "\n\n# 6. RECENT TURNS & IMMEDIATE HISTORY (ROLLING BUFFER)\n" + "\n\n".join(turn_blocks)
+
+        directives_section = ""
+        if campaign_directives:
+            directives_section = f"# 2.1 CAMPAIGN-SPECIFIC DIRECTIVES & PROGRESSION DOCTRINE\n{campaign_directives}\n\n"
+
+        config_section = ""
+        if campaign_config:
+            config_section = f"# 2.2 CAMPAIGN METRICS & CONFIGURATION\n{campaign_config}\n\n"
 
         ontology_section = ""
         if campaign_ontology:
@@ -318,6 +350,8 @@ class PromptAssembler:
             f"{global_rules}\n\n"
             "# 2. ACTIVE CAMPAIGN GAMEPLAY & STATE\n"
             f"{campaign_gameplay}\n\n"
+            f"{directives_section}"
+            f"{config_section}"
             f"{ontology_section}"
             f"{foundation_section}"
             "# 4. WORLD BIBLE & RELEVANT LORE\n"
