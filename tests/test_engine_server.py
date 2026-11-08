@@ -167,6 +167,26 @@ class TestEngineServer(unittest.TestCase):
         data = json.loads(resp_body.decode("utf-8"))
         self.assertIn("error", data)
 
+    def test_generate_post_with_openrouter_key_mock(self):
+        from unittest.mock import patch
+        payload = {
+            "action": "1",
+            "campaign": "template_campaign",
+            "currentTurn": 1,
+            "apiKey": "sk-or-v1-dummy-openrouter-key",
+            "model": "openrouter/anthropic/claude-3.5-sonnet"
+        }
+        with patch.object(EngineRequestHandler, "_call_openrouter", return_value="The shadow recedes as you step into the lower annex.\n\n### [OPTIONS & TYPABLE REFERENCE]\n1. Advance.\n2. Retreat.\n3. Hold.\n4. Scan.\n\n[SYS: Turn 2 | Checkpoints: 5/5]"):
+            status, headers, resp_body = execute_request(
+                "POST",
+                "/generate",
+                body=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            self.assertEqual(status, 200)
+            data = json.loads(resp_body.decode("utf-8"))
+            self.assertIn("The shadow recedes", data["response"])
+
 
 if __name__ == "__main__":
     unittest.main()

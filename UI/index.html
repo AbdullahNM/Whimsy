@@ -197,8 +197,8 @@
       <div class="modal-content">
         <h3>Campaign & Model Settings</h3>
         <label id="gemini-key-label">
-          Gemini API Key <small style="color:var(--gold-dim)">(Only for Cloud models)</small>:
-          <input type="password" id="gemini-api-key" placeholder="AIzaSy... (optional for local)" />
+          API Key <small style="color:var(--gold-dim)">(OpenRouter sk-or-... or Gemini AIzaSy...)</small>:
+          <input type="password" id="gemini-api-key" placeholder="sk-or-v1-... or AIzaSy... (optional for local)" />
         </label>
         <label>
           Prose Length / Pacing:
@@ -212,8 +212,12 @@
           Model Target:
           <select id="gemini-model-select">
             <option value="local-antigravity" selected>Local Antigravity (Local Engine / Agent Bridge)</option>
-            <option value="gemini-2.5-flash">Gemini 2.5 Flash (Cloud API)</option>
-            <option value="gemini-2.5-pro">Gemini 2.5 Pro (Cloud Frontier Reasoning)</option>
+            <option value="openrouter/anthropic/claude-3.5-sonnet">OpenRouter: Claude 3.5 Sonnet</option>
+            <option value="openrouter/google/gemini-2.5-flash">OpenRouter: Gemini 2.5 Flash</option>
+            <option value="openrouter/meta-llama/llama-3.3-70b-instruct">OpenRouter: Llama 3.3 70B Instruct</option>
+            <option value="openrouter/deepseek/deepseek-chat">OpenRouter: DeepSeek Chat</option>
+            <option value="gemini-2.5-flash">Gemini 2.5 Flash (Direct Cloud)</option>
+            <option value="gemini-2.5-pro">Gemini 2.5 Pro (Direct Cloud)</option>
             <option value="local-endpoint">Custom Local Endpoint (Ollama / vLLM / LM Studio)</option>
           </select>
         </label>

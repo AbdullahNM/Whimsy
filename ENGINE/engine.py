@@ -392,13 +392,31 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
     def generate_turn(
         self, campaign: str, action: str, pacing: str, turn: int, payload: dict, system_prompt: str = ""
     ) -> str:
-        # Check if environment or payload has a Gemini key to perform direct LLM generation
-        api_key = payload.get("apiKey") or payload.get("api_key") or os.environ.get("GEMINI_API_KEY")
+        # Check if environment or payload has an API key (OpenRouter or Gemini)
+        api_key = (
+            payload.get("apiKey")
+            or payload.get("api_key")
+            or os.environ.get("OPENROUTER_API_KEY")
+            or os.environ.get("GEMINI_API_KEY")
+        )
+        model = payload.get("model") or os.environ.get("WHIMSY_MODEL")
+
         if api_key:
-            try:
-                return self._call_cloud_gemini(api_key, campaign, action, pacing, turn, system_prompt)
-            except Exception as e:
-                print(f"[Engine] Cloud Gemini call failed: {e}. Falling back to rule-based simulation.")
+            is_openrouter = (
+                api_key.startswith("sk-or-")
+                or "OPENROUTER_API_KEY" in os.environ
+                or (model and ("/" in model or "claude" in model or "gpt" in model or "llama" in model or "deepseek" in model))
+            )
+            if is_openrouter:
+                try:
+                    return self._call_openrouter(api_key, campaign, action, pacing, turn, system_prompt, model=model)
+                except Exception as e:
+                    print(f"[Engine] OpenRouter call failed: {e}. Falling back to rule-based simulation.")
+            else:
+                try:
+                    return self._call_cloud_gemini(api_key, campaign, action, pacing, turn, system_prompt)
+                except Exception as e:
+                    print(f"[Engine] Cloud Gemini call failed: {e}. Falling back to rule-based simulation.")
 
         # Local Engine Simulation adhering strictly to CORE-002, CORE-003 receipts & numbered choices
         next_turn = turn + 1
@@ -463,7 +481,7 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
         self, api_key: str, campaign: str, action: str, pacing: str, turn: int, system_prompt: str = ""
     ) -> str:
         if not system_prompt:
-            assembler = PromptAssembler(workspace_root)
+            assembler = PromptAssembler(ROOT_DIR)
             system_prompt = assembler.build_system_prompt(campaign)
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
 
@@ -480,6 +498,43 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
         with urllib.request.urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             return data["candidates"][0]["content"]["parts"][0]["text"]
+
+    def _call_openrouter(
+        self, api_key: str, campaign: str, action: str, pacing: str, turn: int, system_prompt: str = "", model: str = ""
+    ) -> str:
+        if not system_prompt:
+            assembler = PromptAssembler(ROOT_DIR)
+            system_prompt = assembler.build_system_prompt(campaign)
+        url = "https://openrouter.ai/api/v1/chat/completions"
+
+        target_model = model or os.environ.get("OPENROUTER_MODEL") or "anthropic/claude-3.5-sonnet"
+        if target_model.startswith("openrouter/"):
+            target_model = target_model.replace("openrouter/", "")
+
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": f"Player Action for Turn {turn}: {action}"})
+
+        body = {
+            "model": target_model,
+            "messages": messages,
+            "temperature": 0.7
+        }
+
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(body).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}",
+                "HTTP-Referer": "http://localhost:8000",
+                "X-Title": "Whimsy Local CYOA Engine"
+            }
+        )
+        with urllib.request.urlopen(req, timeout=45) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            return data["choices"][0]["message"]["content"]
 
 
 def main():

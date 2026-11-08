@@ -1374,7 +1374,8 @@ async function callGeminiAPI(apiKey, playerAction, pacing) {
           relations: campaignData.relationsJson || campaignData.relations,
           items: campaignData.itemsJson || campaignData.items,
           pacingGuideline: pacingGuideline,
-          apiKey: apiKey || ''
+          apiKey: apiKey || '',
+          model: model || ''
         })
       });
       if (!res.ok) {
@@ -1390,11 +1391,64 @@ async function callGeminiAPI(apiKey, playerAction, pacing) {
       }
       return data.response || data.text || data.candidates?.[0]?.content?.parts?.[0]?.text || data.choices?.[0]?.message?.content || JSON.stringify(data);
     } catch (err) {
-      throw new Error(`Local Antigravity engine is not responding at ${endpoint}.\n\n• To run locally: run \`python3 ENGINE/engine.py\` in your terminal\n• Or switch to Gemini 2.5 Flash / Pro in Settings (⚙).`);
+      throw new Error(`Local Antigravity engine is not responding at ${endpoint}.\n\n• To run locally: run \`python3 ENGINE/engine.py\` in your terminal\n• Or switch to OpenRouter or Gemini in Settings (⚙).`);
     }
   }
 
-  // 2. Cloud Gemini API Dispatch
+  // 2. OpenRouter API Dispatch (Browser Direct)
+  if (model.startsWith('openrouter/') || (apiKey && apiKey.startsWith('sk-or-'))) {
+    const orModel = model.startsWith('openrouter/') ? model.replace('openrouter/', '') : 'anthropic/claude-3.5-sonnet';
+    const dynamicState = `
+# AUTHORITATIVE LIVING STATE (GAMEPLAY):
+${campaignData.status || (campaignData.statusJson ? JSON.stringify(campaignData.statusJson, null, 2) : "Active Scene Anchor loaded")}
+
+# SOCIAL STANDING & RELATIONSHIPS:
+${campaignData.relations || "Allies and mentors active"}
+
+# INVENTORY & ASSETS:
+${campaignData.items || "Equipped gear and regalia intact"}
+`;
+    const trackedMetrics = (activeConfig && activeConfig.metrics || [])
+      .map(m => `${m.label}${m.max_path ? ' (current / max)' : ''}`)
+      .join(', ') || 'narrative milestones only';
+
+    const systemInstruction = `You are the Game Master for the ${campaignTitle} CYOA RPG.
+${dynamicState}
+
+Tracked values: ${trackedMetrics}.
+
+Formatting & Pacing Rules (CORE-002 & CORE-003):
+1. ${pacingGuideline} Lead with physical choreography and grounded sensory details.
+2. Provide proactive living NPC initiative.
+3. Conclude with 3 to 6 actionable numbered choices (e.g. "1. [Action text]").
+4. Proactive Receipts: If a tracked value shifts, append one exact line:
+   [PROGRESSION/RESOURCE RESOLUTION: Previous: X | Delta: ±Y (Reason) | New Total: Z]
+5. Always finish with the system block:
+   [SYS: Turn ${currentTurn + 1} | <tracked values> | Checkpoints: <C>/5]`;
+
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': window.location.origin,
+        'X-Title': 'Whimsy CYOA RPG'
+      },
+      body: JSON.stringify({
+        model: orModel,
+        messages: [
+          { role: 'system', content: systemInstruction },
+          { role: 'user', content: `Player Action for Turn ${currentTurn}: ${playerAction}` }
+        ],
+        temperature: 0.7
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || 'OpenRouter request failed');
+    return data.choices[0].message.content;
+  }
+
+  // 3. Cloud Gemini API Dispatch
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   // Build dynamic system instruction using loaded GAMEPLAY files
