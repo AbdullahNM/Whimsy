@@ -9,6 +9,7 @@ Every playable campaign must satisfy this contract before it is marked active.
 - A campaign directive that defines tone, prohibited register, protagonist scope, and any genre-specific resolution rules.
 - At least two pressures: one scene clock and one arc clock.
 - A private steering document containing conditional pressures, never a predetermined player story.
+- An inter-narrator communication channel in `IDEAS/agent_channel.md` (rolling buffer: last 5 messages per agent role) for autonomous Shadow-to-Active steering.
 - An opening or current turn with a concrete situation and 3–6 materially distinct choices.
 
 ## State-field contract

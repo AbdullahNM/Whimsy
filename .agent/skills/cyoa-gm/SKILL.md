@@ -23,10 +23,10 @@ This skill defines the complete operational procedure for acting as the Game Mas
 ### Phase A: Cold-Start Initialization (Turn 1 of a New Session)
 When a session initializes or resumes:
 1. **Initial State Read**: Read `CAMPAIGNS/<campaign>/GAMEPLAY/status.json` and the latest turn in `TURNS/ACTIVE/` (e.g. `turn_<latest>.md`).
-2. **Read Campaign Directives**: Read `CAMPAIGNS/<campaign>/AGENTS.md` to load the campaign's setting register, prohibited/mandated vocabulary, protagonist profile, and world parameters.
+2. **Read Campaign Directives & Agent Channel**: Read `CAMPAIGNS/<campaign>/AGENTS.md` and `CAMPAIGNS/<campaign>/IDEAS/agent_channel.md` to load the campaign's setting register, prohibited/mandated vocabulary, protagonist profile, and latest autonomous steering directives from the Shadow Narrator.
 3. **Buffer Working Set Lore**: Read the immediate scene location in `PLACES/` and the active character sheets in `PEOPLE/` (e.g. `active_character.md`).
    - *Quality Assurance*: Once read into the prompt context, the model retains full character voices, vocabulary, and physical descriptions for all subsequent turns.
-4. **Internal Compass (5–10 Turn Direction)**: Build an internal narrative trajectory for the immediate arc (e.g., current scene milestone $\rightarrow$ midday training/investigation $\rightarrow$ afternoon transit/obligation $\rightarrow$ evening routine closure).
+4. **Internal Compass (5–10 Turn Direction)**: Build an internal narrative trajectory for the immediate arc incorporating any pending steering directives from the Shadow Narrator (e.g., current scene milestone $\rightarrow$ midday training/investigation $\rightarrow$ afternoon transit/obligation $\rightarrow$ evening routine closure).
 5. **Present the Scene**: Present the pending turn narrative and choices to the player.
 
 ### Phase B: In-Session Flow (Subsequent Warm Turns 2, 3, 4+)
@@ -92,6 +92,9 @@ Use file editing tools to persist the turn immediately:
    - Update tracked vitals, clocks, flags, and `"scene_anchor"`.
 3. Update `CAMPAIGNS/<campaign>/GAMEPLAY/status.md` with matching data.
 4. If items or relations changed, update `items.json`/`items.md` and `relations.json`/`relations.md`.
+5. **Sync with Shadow Narrator (`IDEAS/agent_channel.md`)**:
+   - If a scene transition, clock tick, milestone, or significant unexpected development occurs, append an `ACTIVE -> SHADOW` message to `CAMPAIGNS/<campaign>/IDEAS/agent_channel.md`.
+   - Pruning rule: Keep strictly the last 5 messages from Active GM and last 5 from Shadow Narrator (maximum 10 messages total in the file). Overwrite/prune older messages upon append.
 
 ### Step 5: Maintain Rolling Context Window (Batch Archival)
 Count the number of files in `CAMPAIGNS/<campaign>/TURNS/ACTIVE/`:

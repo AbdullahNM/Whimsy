@@ -77,6 +77,15 @@ class PromptAssembler:
                 sections.append(f"=== STORY STEERING & IDEAS: {os.path.basename(ifile)} ===\n{f.read()}")
         return "\n\n".join(sections)
 
+    def load_agent_channel(self, campaign_name: str) -> str:
+        channel_path = os.path.join(self.campaigns_dir, campaign_name, "IDEAS", "agent_channel.md")
+        if not os.path.exists(channel_path) and os.path.isdir(campaign_name):
+            channel_path = os.path.join(campaign_name, "IDEAS", "agent_channel.md")
+        if os.path.exists(channel_path):
+            with open(channel_path, "r", encoding="utf-8") as f:
+                return f"=== INTER-NARRATOR COORDINATION: AGENT_CHANNEL.MD ===\n{f.read()}"
+        return ""
+
     def load_world_bible(self, campaign_name: str, specific_categories: list[str] = None) -> str:
         bible_dir = os.path.join(self.campaigns_dir, campaign_name, "WORLD_BIBLE")
         if not os.path.exists(bible_dir):

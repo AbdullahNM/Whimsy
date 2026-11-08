@@ -127,3 +127,21 @@ Never write: “At Turn 34 the player discovers the conspiracy and wins the figh
 ## 8. Chapter Closure
 
 After a major resolution, provide one quiet drawing-close turn before an intermission. The drawing-close turn is diegetic and offers only reflection, recovery, or transition. The separate intermission handles save/checkpoint decisions and then begins the next chapter with a new scene.
+
+## 9. Inter-Narrator Coordination Channel (`IDEAS/agent_channel.md`)
+
+Whimsy CYOA campaigns operate on a dual-agent architecture: the **Active GM** (the player-facing diegetic narrator) and the **Shadow Narrator** (the background campaign overseer and macro-steerer).
+
+To allow autonomous steering and campaign oversight without human intervention:
+1. **The Communication Medium (`CAMPAIGNS/<campaign_id>/IDEAS/agent_channel.md`)**:
+   - A dedicated rolling-buffer dialogue channel between the Shadow Narrator and the Active GM.
+   - Dual-persisted as `agent_channel.json` for deterministic engine tooling.
+2. **Fixed Inspection Interval / Timer**:
+   - The Shadow Narrator maintains an internal cadence (every 5–10 turns or upon scheduled event trigger) to audit recent turns in `TURNS/ACTIVE/`, inspect `GAMEPLAY/status.json`, check faction clocks, and update internal arc compasses in `IDEAS/narrative_steering.md`.
+3. **Autonomous Steering Directives**:
+   - The Shadow Narrator issues direct operational steering to the Active GM: scene constraints, clock increments, pacing gates (e.g. enforcing Zero Micro-Scene Rule on routine tasks), and tone guidelines.
+   - The Active GM incorporates these directives directly into the next turn generation without requiring the player to act as an intermediary or formulate meta-prompts.
+4. **Event & State Sync**:
+   - Upon completing a scene transition, clock advancement, or major milestone, the Active GM posts an update message to `agent_channel.md` summarizing the in-world outcome.
+5. **Rolling Buffer Limit (5 Messages per Role)**:
+   - To prevent token bloat and keep context fresh, the channel strictly retains the **last 5 messages from the Shadow Narrator** and the **last 5 messages from the Active GM** (maximum 10 messages total). Older entries are pruned/overwritten on each append.
