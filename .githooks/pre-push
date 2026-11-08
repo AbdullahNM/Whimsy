@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# Whimsy — private-data guard (pre-push)
+# ==============================================================================
+# Second line of defence: even if a commit was made with --no-verify, refuse to
+# push any commit that adds private campaign data to the public repository.
+#
+# Inspects every commit in the push range, so a file added in one commit and
+# deleted in a later one is still caught.
+# ==============================================================================
+
+set -uo pipefail
+
+ALLOWED_CAMPAIGN="CAMPAIGNS/template_campaign/"
+FORBIDDEN_ROOTS=("notebooklm_export/" "takeout_extracted/")
+ZERO_SHA="0000000000000000000000000000000000000000"
+
+violations=()
+
+record() {
+  local path="$1"
+  case "$path" in
+    CAMPAIGNS/*)
+      case "$path" in
+        "$ALLOWED_CAMPAIGN"*) return ;;
+        *) violations+=("$path") ;;
+      esac
+      ;;
+  esac
+  for root in "${FORBIDDEN_ROOTS[@]}"; do
+    case "$path" in
+      "$root"*) violations+=("$path") ;;
+    esac
+  done
+}
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$local_sha" = "$ZERO_SHA" ] && continue          # branch deletion
+
+  if [ "$remote_sha" = "$ZERO_SHA" ]; then
+    # New branch: everything not already on any remote.
+    range_args=( "$local_sha" --not --remotes )
+  else
+    range_args=( "$remote_sha..$local_sha" )
+  fi
+
+  while IFS= read -r path; do
+    [ -n "$path" ] && record "$path"
+  done < <(git log --pretty=format: --name-only --diff-filter=A "${range_args[@]}" -- CAMPAIGNS notebooklm_export takeout_extracted 2>/dev/null | sort -u)
+done
+
+if [ ${#violations[@]} -gt 0 ]; then
+  {
+    echo ""
+    echo "  ✗ PUSH BLOCKED — private data present in the commits being pushed"
+    echo ""
+    printf '    %s\n' "${violations[@]}"
+    echo ""
+    echo "  This repository is PUBLIC. Personal campaigns belong to the private"
+    echo "  repo rooted at CAMPAIGNS/ (git@github.com:AbdullahNM/whimsy-campaigns.git)."
+    echo ""
+    echo "  Remove the offending commits from the branch before pushing:"
+    echo "      git rebase -i <base>      # or: git reset --soft <base>"
+    echo ""
+  } >&2
+  exit 1
+fi
+
+exit 0

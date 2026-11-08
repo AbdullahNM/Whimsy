@@ -1,0 +1,48 @@
+name: guard-private-data
+
+# Fails the check if personal campaign data is ever tracked in this public repo.
+# Pair with a required status check on `main` so it blocks merges, not just warns.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: No private paths in the working tree
+        run: |
+          set -euo pipefail
+          bad=$(git ls-files -- CAMPAIGNS notebooklm_export takeout_extracted \
+                | grep -v '^CAMPAIGNS/template_campaign/' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::Private campaign data is tracked in this public repo:"
+            echo "$bad"
+            exit 1
+          fi
+          echo "OK: only CAMPAIGNS/template_campaign/ is tracked."
+
+      - name: No private paths anywhere in history
+        run: |
+          set -euo pipefail
+          # Catches add-then-delete, which leaves content in the public git history.
+          bad=$(git log --all --pretty=format: --name-only --diff-filter=A \
+                -- CAMPAIGNS notebooklm_export takeout_extracted \
+                | sort -u | sed '/^$/d' \
+                | grep -v '^CAMPAIGNS/template_campaign/' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::Private campaign data exists in git history:"
+            echo "$bad"
+            exit 1
+          fi
+          echo "OK: history is clean."

@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# Whimsy — private-data guard (pre-commit)
+# ==============================================================================
+# Blocks commits that stage personal campaign data into the PUBLIC Whimsy repo.
+#
+# The public repo ships only CAMPAIGNS/template_campaign/. Personal campaigns live
+# in their own private repo (github.com/AbdullahNM/whimsy-campaigns) whose working
+# tree is rooted at CAMPAIGNS/.
+#
+# .gitignore cannot stop `git add -f`, so this hook enforces the boundary.
+# Bypass is deliberately awkward: --no-verify still works, but a pre-push hook and
+# CI check will catch the result.
+# ==============================================================================
+
+set -uo pipefail
+
+ALLOWED_CAMPAIGN="CAMPAIGNS/template_campaign/"
+
+# Paths that must never exist in the public repo at all.
+FORBIDDEN_ROOTS=(
+  "notebooklm_export/"
+  "takeout_extracted/"
+)
+
+violations=()
+
+while IFS= read -r path; do
+  [ -z "$path" ] && continue
+
+  case "$path" in
+    CAMPAIGNS/*)
+      case "$path" in
+        "$ALLOWED_CAMPAIGN"*) ;;          # template campaign is public
+        *) violations+=("$path") ;;
+      esac
+      ;;
+  esac
+
+  for root in "${FORBIDDEN_ROOTS[@]}"; do
+    case "$path" in
+      "$root"*) violations+=("$path") ;;
+    esac
+  done
+done < <(git diff --cached --name-only --diff-filter=ACMR)
+
+if [ ${#violations[@]} -gt 0 ]; then
+  {
+    echo ""
+    echo "  ✗ COMMIT BLOCKED — private data staged for the PUBLIC Whimsy repo"
+    echo ""
+    printf '    %s\n' "${violations[@]}"
+    echo ""
+    echo "  Personal campaigns belong to the private repo rooted at CAMPAIGNS/:"
+    echo "      cd CAMPAIGNS && git add -A && git commit -m '...'"
+    echo ""
+    echo "  Only CAMPAIGNS/template_campaign/ ships publicly."
+    echo "  If this is a genuine engine change, quote the path explicitly and re-stage."
+    echo ""
+  } >&2
+  exit 1
+fi
+
+exit 0
