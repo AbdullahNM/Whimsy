@@ -188,5 +188,33 @@ class TestEngineServer(unittest.TestCase):
             self.assertIn("The shadow recedes", data["response"])
 
 
+    def test_channel_api_endpoints(self):
+        # GET /api/channel
+        status, headers, resp_body = execute_request("GET", "/api/channel?campaign=template_campaign")
+        self.assertEqual(status, 200)
+        data = json.loads(resp_body.decode("utf-8"))
+        self.assertEqual(data["channel_mode"], "file")
+        self.assertTrue(data["file_fallback"])
+        self.assertIn("messages", data)
+
+        # POST /api/channel
+        post_payload = {
+            "campaign": "template_campaign",
+            "sender": "SHADOW",
+            "content": "API test directive",
+            "turn": 1
+        }
+        status, headers, resp_body = execute_request(
+            "POST",
+            "/api/channel",
+            body=json.dumps(post_payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"}
+        )
+        self.assertEqual(status, 200)
+        post_data = json.loads(resp_body.decode("utf-8"))
+        self.assertEqual(post_data["status"], "success")
+        self.assertTrue(post_data["file_fallback"])
+
+
 if __name__ == "__main__":
     unittest.main()

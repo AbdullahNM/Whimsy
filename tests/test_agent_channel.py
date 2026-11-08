@@ -126,6 +126,32 @@ class TestAgentChannel(unittest.TestCase):
         self.assertIn("AGENT_CHANNEL.MD", channel_text)
         self.assertIn("Ensure Delta: 0 progression", channel_text)
 
+    def test_channel_mode_flag_and_file_fallback(self):
+        # Default mode is strictly 'file'
+        mgr_default = AgentChannelManager(self.campaign_dir)
+        self.assertEqual(mgr_default.channel_mode, "file")
+
+        # Explicit mode flag 'hybrid'
+        mgr_hybrid = AgentChannelManager(self.campaign_dir, channel_mode="hybrid")
+        self.assertEqual(mgr_hybrid.channel_mode, "hybrid")
+
+        # In hybrid mode, posting a message updates memory AND flushes to file fallback
+        mgr_hybrid.post_message(
+            sender="SHADOW",
+            content="Hybrid mode directive.",
+            turn=10
+        )
+        self.assertTrue(os.path.exists(mgr_hybrid.md_path))
+        with open(mgr_hybrid.md_path, "r", encoding="utf-8") as f:
+            md_content = f.read()
+        self.assertIn("Hybrid mode directive.", md_content)
+
+        # File reader still loads it perfectly
+        mgr_file = AgentChannelManager(self.campaign_dir, channel_mode="file")
+        loaded = mgr_file.load_messages()
+        self.assertEqual(len(loaded), 1)
+        self.assertEqual(loaded[0]["content"], "Hybrid mode directive.")
+
 
 if __name__ == "__main__":
     unittest.main()
