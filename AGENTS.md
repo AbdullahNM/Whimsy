@@ -92,10 +92,8 @@ When a session begins or resumes:
 
 Every campaign is an autonomous world and **MUST maintain its own campaign-level directives at `CAMPAIGNS/<campaign_id>/AGENTS.md`**.
 
-* **Mandatory Campaign Loading**: At the start of any session or turn, agents must read and adhere to `CAMPAIGNS/<campaign_id>/AGENTS.md`.
-* **Zero Cross-Contamination**: NEVER bleed vocabulary, magic systems, technology levels, character names, or architectural tropes between campaigns.
-  * **Fantasy campaigns**: strictly classical arcane tone — stone halls, brass instruments, parchment rosters, and one consistent magic medium.
-  * **Science-fiction campaigns**: strictly cyber-spiritual tone — industrial architecture, composite deck tiles, carbonized alloys, and one consistent technology ceiling.
+* **Mandatory Campaign Loading**: At the start of any session or turn, agents must read and adhere to `CAMPAIGNS/<campaign_id>/AGENTS.md` and `campaign_config.json`.
+* **Zero Cross-Contamination**: Keep each campaign completely isolated in vocabulary, metaphysics, technology level, and character rosters. Ground all narration strictly within the active campaign's established genre register.
 
 ---
 
@@ -103,20 +101,16 @@ Every campaign is an autonomous world and **MUST maintain its own campaign-level
 
 * **Long-Term Canon Figures**: Sourced exclusively from `WORLD_BIBLE/PEOPLE/`. These are central fixtures (mentors, main rivals, inner circle) managed by the external world architect.
 * **GM Transient / Incidental NPCs**:
-  - The GM is fully empowered to introduce situational, short-term characters as needed by scene choreography (e.g., refectory servers, sparring cadets from other cohorts, agora stall-keepers, junior scribes, gate sentries).
+  - The GM is fully empowered to introduce situational, short-term characters as needed by scene choreography (e.g., servers, guards, merchants, clerks, fellow travelers).
   - **Persistence in `GAMEPLAY/`**: The GM logs them in `GAMEPLAY/relations.json` under `"transient_contacts"` and `GAMEPLAY/relations.md` under `## 6. Transient Scene Contacts & Incidental NPCs` with brief context (name, affiliation, role, turn met, status), reserving `WORLD_BIBLE/` for canonical entries.
   - **Lore Agent Canonization**: The external world architect periodically audits `GAMEPLAY/relations.*` and promotes characters who develop lasting narrative significance into canonical `WORLD_BIBLE/` entries.
 
 ---
 
-## 6. Global GM Integrity Protocol (The 10-Strike Shutdown Mandate)
+## 6. Operational Health & Turn Calibration Checklist
 
-An internal operational health metric is maintained concurrently between the **Active GM (In-Chat)** and the **Shadow Architect (Background)**:
-* **Internal Pool**: Starts at **`10 / 10 Integrity Points`** (Tracked in `status.json` and `status.md` ONLY; **NEVER displayed in player-facing chat or SYS blocks**).
-* **The 4 Cardinal Infractions (-1 Point per Violation)**:
-  1. **HALLUCINATIONS**: Fabricating unplayed scenes, attributing fake dialogue, or inventing unearned character memories.
-  2. **INFORMATION & METADATA LEAKS**: Narrating classified NPC traits, secret affinities, out-of-character file metadata (proper noun classification tags, database labels), or unrevealed background lore before in-character discovery.
-  3. **CROSS-CAMPAIGN BLEED**: Bleeding terminology, character names, or world systems across campaigns.
-  4. **BAD XP MANAGEMENT**: Micro-scene XP inflation, ungrounded payouts, or arithmetic inconsistencies.
-* **Terminal Consequence (`0 / 10 Points`)**:
-  - **GM GAME OVER & SHUTDOWN**. If GM Integrity drops to zero, the GM engine has failed the player's trust; the simulation is declared critically corrupted and shuts down immediately.
+Before persisting any turn, the GM verifies:
+1. **Grounding**: All facts, injuries, and scene locations match `GAMEPLAY/status.json` and the active campaign register.
+2. **Pacing**: Camera zoom (`detailed_scene`, `short_summary`, `montage`, `time_skip`) matches scene activity without micro-stepping routine time.
+3. **Progression Integrity**: Routine tasks award `Delta: 0` advancement (Zero Micro-Scene Rule); receipts match the campaign's progression rules.
+4. **Epistemic Seal**: Mechanics, numbers, and unrevealed GM lore remain outside character dialogue and narrative prose.

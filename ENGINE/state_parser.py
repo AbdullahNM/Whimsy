@@ -9,10 +9,16 @@ class StateParser:
     - [SYS: Turn X | ...]
     """
 
-    @staticmethod
-    def parse_xp_resolution(text: str) -> Optional[Dict[str, Any]]:
-        # Pattern: [XP RESOLUTION: Previous: 295 | Delta: +20 (...) | New Total: 315 / 500]
-        pattern = r'\[XP RESOLUTION:\s*Previous:\s*(\d+)\s*\|\s*Delta:\s*([+\-]?\d+)(?:\s*\((.*?)\))?\s*\|\s*New Total:\s*(\d+)\s*\/\s*(\d+)\]'
+    @classmethod
+    def parse_progression_resolution(cls, text: str) -> Optional[Dict[str, Any]]:
+        """
+        Parses progression/XP resolutions in a campaign-agnostic manner:
+        [PROGRESSION/XP RESOLUTION: Previous: X | Delta: ±Y (Reason) | New Total: Z / Threshold]
+        [XP RESOLUTION: Previous: X | Delta: ±Y (Reason) | New Total: Z / Threshold]
+        [PROGRESSION RESOLUTION: Previous: X | Delta: ±Y (Reason) | New Total: Z / Threshold]
+        [<METRIC> RESOLUTION: Previous: X | Delta: ±Y (Reason) | New Total: Z / Threshold]
+        """
+        pattern = r'\[(?:PROGRESSION\/XP|PROGRESSION|XP|[A-Z_]+)\s+RESOLUTION:\s*Previous:\s*(\d+)\s*\|\s*Delta:\s*([+\-]?\d+)(?:\s*\((.*?)\))?\s*\|\s*New Total:\s*(\d+)(?:\s*\/\s*(\d+))?\]'
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
             return {
@@ -20,16 +26,20 @@ class StateParser:
                 "delta": int(match.group(2)),
                 "reason": match.group(3).strip() if match.group(3) else None,
                 "current": int(match.group(4)),
-                "threshold": int(match.group(5))
+                "threshold": int(match.group(5)) if match.group(5) else None
             }
         # Fallback simpler regex
-        fallback = re.search(r'\[XP RESOLUTION:.*?New Total:\s*(\d+)\s*\/\s*(\d+)\]', text, re.IGNORECASE)
+        fallback = re.search(r'\[(?:PROGRESSION\/XP|PROGRESSION|XP|[A-Z_]+)\s+RESOLUTION:.*?New Total:\s*(\d+)(?:\s*\/\s*(\d+))?\]', text, re.IGNORECASE)
         if fallback:
             return {
                 "current": int(fallback.group(1)),
-                "threshold": int(fallback.group(2))
+                "threshold": int(fallback.group(2)) if fallback.group(2) else None
             }
         return None
+
+    @classmethod
+    def parse_xp_resolution(cls, text: str) -> Optional[Dict[str, Any]]:
+        return cls.parse_progression_resolution(text)
 
     @staticmethod
     def parse_currency_resolution(text: str) -> Optional[Dict[str, Any]]:

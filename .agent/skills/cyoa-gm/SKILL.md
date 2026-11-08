@@ -93,9 +93,10 @@ Use file editing tools to persist the turn immediately:
 3. Update `CAMPAIGNS/<campaign>/GAMEPLAY/status.md` with matching data.
 4. If items or relations changed, update `items.json`/`items.md` and `relations.json`/`relations.md`.
 
-### Step 5: Maintain Rolling Context Window
+### Step 5: Maintain Rolling Context Window (Batch Archival)
 Count the number of files in `CAMPAIGNS/<campaign>/TURNS/ACTIVE/`:
-- If the count exceeds 15 turns, move the oldest file into `CAMPAIGNS/<campaign>/TURNS/ARCHIVE/`.
+- **Batch Archival Rule**: When `ACTIVE/` reaches **20 turns**, move the oldest **5 turns** into `TURNS/ARCHIVE/` in a single batch (resetting `ACTIVE/` to 15 turns).
+- For turns 16–19, leave all active turns in `ACTIVE/` untouched without moving files.
 
 ### Step 6: Output to Player
 Output the generated turn in chat, and prompt the player for their next move!

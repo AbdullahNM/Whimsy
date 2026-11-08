@@ -88,9 +88,17 @@ An open period may use a time-block hub. Establish a finite time budget and a st
 
 When the budget is exhausted, advance to the next pressure or scheduled event. Hub options must narrow rather than endlessly regenerate.
 
-## 5. Progression and Economy
+## 5. Campaign-Agnostic Progression and Economy
 
-Routine advancement is granted only at the closing turn of the relevant cycle. Event advancement is granted only when a defined phase has been completed. A receipt must show previous value, delta, cause, and new value.
+Progression systems are defined strictly by individual campaign configurations (`campaign_config.json`, `CONFIG.yaml`, and `AGENTS.md`). A campaign may use numeric XP, cultivation tiers, investigation clues, stress/sanity gauges, realm assets, or purely milestone checkpoints—or no numerical progression at all.
+
+Regardless of the system used, the engine deterministically enforces the **Zero Micro-Scene Rule**:
+- **Routine Scene Turns** (conversations, transit, meals, shopping, or low-intensity tasks): Award strictly `Delta: 0` advancement. Narrative agency, information discovery, items, and social developments are their own rewards.
+- **Cycle Wind-Downs & Rest**: Routine advancement (e.g. daily cultivation or fatigue recovery) is awarded only at the closing turn of a full routine cycle or evening wind-down.
+- **Event / Bout Advancement**: Advancement for challenges is awarded only upon completing an entire structured challenge phase or competitive trial.
+- **Receipt Standard**: If a numerical metric changes, output an explicit itemized receipt:
+  `[<METRIC> RESOLUTION: Previous: X | Delta: ±Y (Reason) | New Total: Z / Threshold]`
+  (e.g., `[PROGRESSION/XP RESOLUTION: ...]`, `[DIVINITY RESOLUTION: ...]`, `[REALM RESOLUTION: ...]`).
 
 Costs must be shown on the option that spends a player resource. Currency, supplies, fatigue, and social favours matter only if they restrict or enable future actions; avoid decorative accounting.
 

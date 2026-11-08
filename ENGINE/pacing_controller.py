@@ -411,6 +411,81 @@ class PacingController:
         # Default ordinary baseline
         return max(1, min(2, curr_intensity))
 
+    def validate_progression_pacing(
+        self,
+        zoom_level: str,
+        scene_type: str,
+        delta: int,
+        is_milestone: bool = False,
+        is_cycle_end: bool = False,
+    ) -> Tuple[bool, str]:
+        """
+        Enforces the campaign-agnostic Zero Micro-Scene Rule:
+        - Routine conversation, transit, meals, shopping, or low-intensity scene tasks yield Delta: 0 progression advancement.
+        - Advancement deltas (> 0) require either:
+          a) montage zoom level,
+          b) completed cycle/evening wind-down (is_cycle_end=True), or
+          c) structured milestone / tournament / trial bout (is_milestone=True).
+        """
+        if delta == 0:
+            return True, "Zero micro-scene progression delta approved."
+
+        if delta < 0:
+            return True, "Resource/progression expenditure or strain penalty approved."
+
+        # delta > 0: check if pacing justifies progression advancement
+        if is_milestone or is_cycle_end or zoom_level in [ZOOM_MONTAGE, ZOOM_TIME_SKIP]:
+            return True, "Progression advancement approved for macro pacing or milestone."
+
+        if scene_type in [SCENE_CONVERSATION, SCENE_TRAVEL, SCENE_DOWNTIME, SCENE_ROUTINE]:
+            return False, (
+                f"Progression pacing violation: Scene type '{scene_type}' under '{zoom_level}' zoom "
+                f"must award Delta: 0 advancement (Zero Micro-Scene Rule). "
+                f"Progression advancement is reserved for completed routine cycles, combat/sparring trials, or major milestones."
+            )
+
+        return True, "Progression advancement approved."
+
+    def recommend_progression_envelope(
+        self,
+        zoom_level: str,
+        scene_type: str,
+        is_milestone: bool = False,
+        is_cycle_end: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Provides campaign-agnostic progression guidance for the current pacing context.
+        """
+        if is_milestone:
+            return {
+                "allowed": True,
+                "reason": "Milestone / tournament / major breakthrough",
+                "recommended_delta_type": "milestone_package",
+            }
+        if is_cycle_end:
+            return {
+                "allowed": True,
+                "reason": "Daily/weekly cycle wind-down closure",
+                "recommended_delta_type": "cycle_routine",
+            }
+        if zoom_level in [ZOOM_MONTAGE, ZOOM_TIME_SKIP]:
+            return {
+                "allowed": True,
+                "reason": "Extended time compression / montage",
+                "recommended_delta_type": "montage_macro",
+            }
+        if scene_type in [SCENE_CONVERSATION, SCENE_TRAVEL, SCENE_DOWNTIME, SCENE_ROUTINE]:
+            return {
+                "allowed": False,
+                "reason": "Routine scene task: strictly Delta: 0 (Zero Micro-Scene Rule)",
+                "recommended_delta_type": "zero_delta",
+            }
+        return {
+            "allowed": True,
+            "reason": "Active combat / challenge scene phase",
+            "recommended_delta_type": "phase_award",
+        }
+
     def advance_time(
         self,
         current_pacing: Dict[str, Any],

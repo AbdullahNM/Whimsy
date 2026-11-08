@@ -301,10 +301,22 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
             )
 
             # -------------------------------------------------------------
-            # STEP 6: StyleContractValidator.validate_prose()
+            # STEP 6: StyleContractValidator.validate_prose() & Progression Pacing Check
             # -------------------------------------------------------------
             style_validator = StyleContractValidator.from_campaign(campaign, workspace_root)
             is_style_valid, violations, style_score = style_validator.validate_prose(response_text)
+
+            # Validate progression pacing against Zero Micro-Scene Rule
+            progression_data = StateParser.parse_progression_resolution(response_text)
+            progression_valid = True
+            progression_warning = None
+            if progression_data and "delta" in progression_data:
+                scene_type = updated_pacing.get("scene_type", "exploration")
+                progression_valid, progression_warning = pacing_ctrl.validate_progression_pacing(
+                    zoom_level=proposed_zoom,
+                    scene_type=scene_type,
+                    delta=progression_data["delta"]
+                )
 
             # -------------------------------------------------------------
             # STEP 7: TransactionManager stages mutations and commits atomically
@@ -369,6 +381,8 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
                 "triggered_events": triggered_events,
                 "style_score": style_score,
                 "style_valid": is_style_valid,
+                "progression_valid": progression_valid,
+                "progression_warning": progression_warning,
                 "committed": (tx_result is not None or committed_record is not None)
             }).encode("utf-8"))
         else:

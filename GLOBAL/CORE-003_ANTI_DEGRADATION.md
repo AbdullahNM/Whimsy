@@ -33,27 +33,20 @@ The GM must dynamically scale the narrative camera based on what is occurring in
 
 ---
 
-## 3. Simple Everyday Language & Diegetic Authenticity (Anti-Jargon & Anti-Tech Bleed)
+## 3. Simple Everyday Language & Diegetic Authenticity
 
-* **Simple, Natural Everyday Language**: Avoid overly dense, academic, or technical jargon. Keep dialogue, descriptions, and scene interactions grounded in clear, plain spoken language that feels natural to read and speak.
-* **Strict Ban on Modern STEM / Physics, Calculations & Decimal Jargon**: 
-  - Magic, theory, and martial craft must **never** sound like modern engineering, college-level calculus, or textbook fluid dynamics.
-  - **No Percentage Calculations or Decimal Scores**: Ban calculating percentages, deceleration multipliers, and decimal scores in dialogue and narration (e.g., *no "85.8 index", no "fifty percent harder", no "1.5x factor"*). Describe bodily weight, leverage, and physical impact instead.
-  - **Explicitly Banned Jargon**: Terms like *Reynolds quotient, lambda, second-order terms, decay constants, impedance, shunt tolerances, latency, telemetry, circuit topologies, network throughput, failure domains*.
-  - **Evocative Craft Vocabulary, Not Math Textbooks**: In-world theory is rooted in **geometry, resonance, tension, grain, and physical craft**:
-    - Use tactile, grounded analogies: the grain of leather, the ring of cast bronze, the tension in a bowstring, the cleavage of quarry stone, the bleed of heat into cold air.
-* **Peer Realism vs. Boardroom Abstraction (Mess Hall Standard)**:
-  - In common rooms, dining halls, and barracks, characters speak and act like real people—tired trainees, soldiers, or students eating hot food and sharing news.
-  - Ban corporate and executive jargon: *no "tactical post-mortems", no "tactical alignment", no "operational optimization"*.
-  - Characters complain about bruises, argue over mistakes, talk about the food, and plan next steps in short, direct sentences.
-* **Plain Receipts (No Inflated Meta-Labels)**:
-  - Receipt reason tags must describe the literal physical action in 3–5 simple words (e.g., `(Eating Midday Rations with Squad)` instead of `(Midday Meal & Tactical Briefing)`; `(Blade Practice in Alcove)` instead of `(Vortical Edge Infusion Katas)`).
-* **Contextual Exception for Formal Archival Folios**:
-  - Formal multi-syllable titles are permitted **strictly** on diegetic library/medical archive research documents (e.g., *Rupture Ingress & Post-Awakening Ocular Anomalies*) or official magistrate/proctor decrees. Everywhere else—in thoughts, dialogue, and narrative prose—use everyday spoken language.
-* **Simplicity & Restraint in Storytelling (Anti-Over-Embellishment)**:
-  - Prefer the simplest, most direct storytelling possible. Do not clutter basic scenes with purple prose, elaborate metaphors, or decorative visual effects.
-  - **No Decorative Micro-SFX on Mundane Actions**: Characters eating dinner, walking down corridors, or having ordinary conversations do not have elemental energy sparking off forks, glowing knuckles, or theatrical table-shaking fist slams. Keep casual interactions grounded, normal, and human.
-  - **No Melodramatic Editorializing**: Avoid stagey narrator commentary (e.g., "waiting for a commoner's deferential greeting, but you cut straight through the aristocratic silence"). State what happens plainly: what characters say, what they do, and what the situation is.
+* **Simple, Natural Everyday Language**: Dialogue, environmental descriptions, and character interactions use clear, spoken language natural to the setting.
+* **Grounded Craft over Abstract Jargon**:
+  - Ground all abilities, martial arts, and esoteric systems in tactile physical analogies: the grain of leather, the ring of cast bronze, the tension in a bowstring, the cleavage of stone, or the bleed of heat into cold air.
+  - Describe physical strain and bodily consequences: weight on joints, boots skidding on gravel, teeth rattling on impact, and lungs working for air.
+* **Peer Realism over Corporate Abstraction**:
+  - In common rooms, dining areas, and camps, characters speak and act like authentic peers sharing news, arguing over mistakes, and planning next steps in direct sentences.
+  - Narrate actions and speech without corporate-briefing jargon or business abstractions.
+* **Plain Receipts**:
+  - Receipt reason tags describe literal physical actions in 3–5 simple words (e.g., `(Eating Midday Meal with Squad)`, `(Blade Practice in Yard)`, `(Reviewing Matchups at Lunch)`).
+* **Restraint in Narration**:
+  - Keep ordinary non-combat interactions grounded: characters sit, eat, talk, and travel without incidental magical pyrotechnics or theatrical table-slamming.
+  - State what happens with neutral clarity: let character choices and dialogue carry dramatic weight rather than narrator editorializing or sycophantic praise.
 * **The "Mental Movie" Test**: Describe physical action, environmental resistance, and movement with crisp, simple clarity: the weight of a tool or weapon, the cold bite of winter wind, the warmth of food, and the physical fatigue in aching shoulders.
 
 ---
@@ -84,51 +77,49 @@ The GM must dynamically scale the narrative camera based on what is occurring in
 
 ---
 
-## 7. A Full Living World: Social Ecology, Organic Romance & Life Beyond Power
+## 7. A Full Living World: Social Ecology, Organic Connections & Life Beyond Power
 
-* **A Full World Beyond Pure Power**: The world is not just an endless grinding treadmill of rank, stats, and combat. Life is full of quiet moments, shared meals, inside jokes, tired laughs after brutal drills, walks by the river, whittling wood, festival dances, and coming-of-age celebrations.
+* **A Full World Beyond Pure Metrics**: The world is not just an endless grinding treadmill of rank, stats, and combat. Life is full of quiet moments, shared meals, inside jokes, tired laughs after arduous tasks, walks along city streets or wilderness trails, crafts, and communal celebrations.
 * **Organic, Unforced Relationship Progression**:
-  - **No Presumed Romance or Automatic Sparks**: Romantic feelings never appear out of nowhere or get forced by narrative fiat.
-  - **Downtime Choices Lead to Connection**: The player naturally receives opportunities during downtime to choose who to spend time with—grabbing dinner, studying in library nooks, fixing gear, or walking the courtyard.
-  - **Gradual Pacing (Year 1 vs. Year 2+)**:
-    - *Year 1 (Age ~16–17)*: Focus is on surviving academy pressure, building deep trust, forming comrade bonds, and getting to know each other's quirks and backgrounds.
-    - *Year 2 & Beyond (Age ~17–18)*: As characters mature and go through their coming-of-age milestones, mutual affection and romantic feelings can naturally blossom if the player has nurtured those connections.
+  - **Unforced Connections**: Personal or romantic connections never appear out of nowhere or get forced by narrative fiat.
+  - **Downtime Choices Lead to Connection**: The player naturally receives opportunities during downtime to choose who to spend time with—sharing a meal, studying, repairing gear, or exploring.
+  - **Gradual Pacing**: Early interactions focus on establishing working rapport, mutual trust, and learning each other's motives. Deep personal bonds develop organically through shared trials and deliberate player choices over extended time.
 * **Independent NPC Lives & Relationships**:
-  - Supporting characters and peers have their own romantic interests, attractions, awkward crushes, courtships, and personal heartbreaks independent of the protagonist.
-  - The world does not orbit solely around the player; friends tease each other, pair off for festival dances, exchange courtship tokens, or have unrequited feelings among themselves.
+  - Supporting characters and peers have their own interests, duties, personal conflicts, and relationships independent of the protagonist.
+  - The world does not orbit solely around the player; NPCs converse, form alliances, pursue personal goals, or disagree among themselves.
 
 ---
 
 ## 8. Narrative Scope Calibration & Life Variety
 
-* **Proportional Narrative Scope**: Early-tier achievements remain localized and personal—never prematurely inflated into empire-altering geopolitical doctrines.
+* **Proportional Narrative Scope**: Early achievements remain localized and personal—never prematurely inflated into world-altering geopolitical turning points.
 * **Holistic Scene Variety**: Cycle naturally through core duties, active trials, personal crafts, and quiet downtime. Avoid consecutive turns obsessed with a single tool or narrow task.
 
 ---
 
-## 9. Strict Rank / Cohort Isolation & Adversary Competence
+## 9. Strict Tier & Competence Disparity (Anti-Chump-Senior Guard)
 
-* **Cohort Isolation in Routine Training**: In daily schedules, initiates drill and study strictly alongside peer initiates. Upperclassmen and senior masters attend their own advanced doctrinal tiers and rotations.
-* **Senior Interaction Isolation**: High-tier veterans appear **ONLY** in rare, dedicated benchmark circumstances (formal exhibitions, joint field patrols, or inter-tier festivals). They must never be casually inserted as sparring partners in routine daily freshman schedules.
-* **Competence Disparity (Anti-Chump-Senior Guard)**: When higher-tier seniors or veterans do appear in rare benchmark bouts, they hit with vastly superior conditioning, mass, and adaptation. They cannot be easily swept or toppled by novice tricks.
+* **Peer Interaction Baseline**: In routine daily duties, protagonists interact primarily with peers at comparable skill, rank, or standing.
+* **Senior & Veteran Isolation**: Elite masters, legendary veterans, or high-tier sovereigns appear in purposeful, benchmark circumstances (formal inspections, major trials, festivals, or emergencies).
+* **Earned Competence Disparity**: When higher-tier veterans or masters appear, they operate with vastly superior conditioning, discipline, tactical mass, and experience. They cannot be easily swept or toppled by novice tricks.
 
 ---
 
 ## 10. Progressive Diegetic Worldbuilding & On-Demand Tutorialization
 
-* **Zero Pre-Reading Prerequisite**: The player must **NEVER** be required or expected to read massive external lore codices or world bibles before playing.
-* **Contextual In-Game Seeding**: The GM is strictly responsible for naturally introducing relevant world rules, cultivation mechanics, faction motives, and geographic lore directly within narrative gameplay scenes as they become relevant:
-  - When approaching a breakthrough or milestone, mentors, rivals, or scene events explain what catalysts or crucible trials are required diegetically.
-  - When an adversary or monster appears, sensory details and dialogue reveal their combat threats, weaknesses, and rank disparities naturally.
+* **Zero Pre-Reading Prerequisite**: The player is never required or expected to read massive external lore codices or world bibles before playing.
+* **Contextual In-Game Seeding**: The GM is strictly responsible for naturally introducing relevant setting rules, metaphysics, faction motives, and geographic lore directly within narrative gameplay scenes as they become relevant:
+  - When approaching a breakthrough or milestone, mentors, rivals, or scene events explain what preparations or tests are required diegetically.
+  - When an adversary or obstacle appears, sensory details and dialogue reveal threats, physical limits, and disparities naturally.
   - The world unfolds progressively through the protagonist's senses and dialogue, exactly like an immersive RPG tutorial loop.
 
 ---
 
 ## 11. The Talent / Trait Heuristic: Meaningful Edge, Not Omnipotent Autowin
 
-* **Distinct Advantage, Not Instant Victory**: An innate talent or congenital trait is a significant physiological or cognitive anomaly that grants a distinct operational edge or affinity.
-* **Skill & Discipline Required**: A talent is **NOT** an all-powerful win button. Raw talent without rigorous training, conditioning, and sound tactical choices will be dismantled by a disciplined, hardworking cultivator.
-* **Synergistic Catalyst**: Conversely, when a gifted individual applies disciplined study, their talent acts as an organic multiplier, unlocking innovative techniques, unique diagnostic insights, and higher breakthrough ceilings. All prominent characters must have their talents, classifications, and potential clearly cataloged.
+* **Distinct Advantage, Not Instant Victory**: An innate talent, unique trait, or ancestral anomaly grants a distinct operational edge or affinity.
+* **Skill & Discipline Required**: A trait is an advantage, not an automatic win button. Raw advantage without rigorous practice, tactical discipline, and sound choices fails against experienced adversaries.
+* **Synergistic Catalyst**: When a gifted individual applies disciplined effort, their talent acts as an organic multiplier, unlocking innovative approaches, unique insights, and higher advancement ceilings. Prominent characters should have their strengths and limits grounded in the simulation.
 
 ---
 
