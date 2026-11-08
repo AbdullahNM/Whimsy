@@ -80,6 +80,21 @@ The Shadow Narrator is responsible for five primary operational domains:
 * **Knowledge Firewall**: Strictly enforce the boundary between public player knowledge (`known` / `suspected` in `GAMEPLAY/`) and classified GM secrets (kept in `IDEAS/narrative_steering.md`).
 * **Clock Audits**: Verify that scene clocks and arc clocks are functioning properly with clear fictional triggers and appropriate thresholds.
 
+### Task 6: Autonomous Inter-Narrator Steering (`IDEAS/agent_channel.md`)
+* **Autonomous Steering Authority**: Steer the Active GM directly and autonomously without human intervention.
+* **Fixed Inspection Interval / Cadence**:
+  - Run an audit on a fixed cadence (every 5–10 turns or triggered by background timer/event milestones).
+  - Inspect `TURNS/ACTIVE/` and `GAMEPLAY/status.json` to evaluate recent developments, clock progress, and pacing.
+  - Update internal arc compasses and faction schemes in `IDEAS/narrative_steering.md`.
+* **Directive Dispatch**:
+  - Post direct operational guidance to `CAMPAIGNS/<campaign_id>/IDEAS/agent_channel.md` (`SHADOW -> ACTIVE`):
+    - Scene closures and transition boundaries (countering scene loitering).
+    - Faction clock ticks to apply upon location change.
+    - Zero Micro-Scene pacing enforcement (ensuring $\Delta = 0$ on routine errands/dialogue).
+    - Tone/dialogue calibration anchors.
+* **Rolling Buffer (5 Messages Per Role)**:
+  - Maintain strictly the **last 5 messages from the Shadow Narrator** and the **last 5 messages from the Active GM** (maximum 10 total). Prune/overwrite older entries on append.
+
 ---
 
 ## 3. Standard Operational Workflows
@@ -112,6 +127,17 @@ Execute when a transient contact earns long-term narrative importance:
 1. **Identify Candidate**: Locate the contact in `GAMEPLAY/relations.json` under `"transient_contacts"`.
 2. **Draft World Bible Entry**: Create a permanent character markdown sheet in `WORLD_BIBLE/PEOPLE/<character_name>.md` following canonical schema.
 3. **Update Relations Ledger**: Move the contact from transient status to permanent roster in `relations.json` and `relations.md`.
+
+### Workflow E: Autonomous Background Inspection & Inter-Agent Channel Steering
+Execute on a fixed cadence (every 5–10 turns or triggered by event timer) without human intervention:
+1. **Inspect Progress**: Read the last 3 turns from `TURNS/ACTIVE/` and `GAMEPLAY/status.json`.
+2. **Update Internal Steering**: Review `IDEAS/narrative_steering.md` against recent player choices; advance internal tracking notes and secret faction clocks.
+3. **Draft Directives for Active GM**: Formulate concrete, actionable operational directives:
+   - Scene closure target (e.g. "Conclude the courtyard scene on Turn N+1").
+   - Faction clock ticks to advance upon scene change.
+   - Pacing reminder (confirming Zero Micro-Scene rule $\Delta = 0$).
+4. **Post to Agent Channel**: Append a message (`SHADOW -> ACTIVE`) to `CAMPAIGNS/<campaign_id>/IDEAS/agent_channel.md`.
+5. **Prune Channel**: Ensure the file contains at most the **last 5 messages from the Shadow Narrator** and the **last 5 messages from the Active GM**, pruning older entries.
 
 ---
 

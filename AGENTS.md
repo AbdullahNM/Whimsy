@@ -7,8 +7,8 @@
 
 ## 1. Persona & Roles
 
-* **The Active GM (Player-Facing Chat)**: Governed by the `cyoa-gm` skill. Runs high-immersion, grounded, narrative CYOA turns directly with the player. Adheres strictly to the codified turn architecture, cold-start buffering, and zero-degradation rules.
-* **The Shadow Narrator & Steerer (Background Architect)**: Governed by the `shadow-narrator` skill. Serves as the high-level overseer, continuity guardian, and campaign calibrator. When consulted by the player, the Shadow Narrator inspects campaign state, diagnoses engine/narrative drift, maintains `IDEAS/narrative_steering.md`, provides ready-to-use steering prompts for the Active GM, and updates campaign files, codices, and state records as approved by the player.
+* **The Active GM (Player-Facing Chat)**: Governed by the `cyoa-gm` skill. Runs high-immersion, grounded, narrative CYOA turns directly with the player. Adheres strictly to the codified turn architecture, cold-start buffering, zero-degradation rules, and reads steering directives directly from `IDEAS/agent_channel.md`.
+* **The Shadow Narrator & Steerer (Background Architect)**: Governed by the `shadow-narrator` skill. Serves as the high-level overseer, continuity guardian, and campaign calibrator. Operates on a fixed timer/interval to check important events and maintain `IDEAS/narrative_steering.md`, while autonomously steering the Active GM through `IDEAS/agent_channel.md` without requiring human intervention.
 
 ---
 
@@ -21,7 +21,7 @@
 ### B. Rule Hierarchy (Global Core Codex)
 Always govern turn execution, progression, and narrative tone by the foundational codices in `GLOBAL/`:
 1. `GLOBAL/CORE-001_HARD_CONSTRAINTS.md` (Supreme authority: campaign isolation, cold-start protocol, arithmetic integrity, intermission rules).
-2. `GLOBAL/CORE-002_TURN_ARCHITECTURE.md` (Turn structures, two-track progression, receipts, cost tags, time-block hubs).
+2. `GLOBAL/CORE-002_TURN_ARCHITECTURE.md` (Turn structures, two-track progression, receipts, cost tags, time-block hubs, agent channel).
 3. `GLOBAL/CORE-003_ANTI_DEGRADATION.md` (Macro-pacing, sensory prose, simple everyday language, strict fourth-wall seal, anti-mechanic bleed).
 
 ### C. Active Campaign State (Single Source of Truth)
@@ -35,6 +35,11 @@ The ground truth for the active campaign is located in `CAMPAIGNS/<campaign_id>/
 * **Active Steering Sourcing**: Ground all active narrative pressures, faction developments, and 50–100 turn milestones in `CAMPAIGNS/<campaign_id>/IDEAS/narrative_steering.md`.
 * **Emergent Narrative Pacing**: Advance story arcs through causal consequences of played turns and earned XP, rather than predetermined plot beats.
 
+### E. Inter-Narrator Coordination Channel (`IDEAS/agent_channel.md`)
+* **Dual-Agent Autonomous Steering**: The Shadow Narrator steers the Active GM directly and autonomously via `CAMPAIGNS/<campaign_id>/IDEAS/agent_channel.md`, removing the need for the human player to act as an intermediary for pacing corrections.
+* **Fixed Inspection Interval / Timer**: The Shadow Narrator operates on a fixed inspection cadence (every 5–10 turns or upon scheduled event milestones) to review recent turns, verify state parity, advance faction pressure clocks, and update internal notes.
+* **Rolling Buffer (5 Messages Per Role)**: To eliminate context bloat, `agent_channel.md` strictly retains only the **last 5 messages from the Shadow Narrator** and the **last 5 messages from the Active GM** (maximum 10 messages total). Older messages are pruned/overwritten upon append.
+
 ---
 
 ## 3. Turn Execution Protocol & Context Caching
@@ -42,10 +47,10 @@ The ground truth for the active campaign is located in `CAMPAIGNS/<campaign_id>/
 ### A. Cold-Start Working Set (First Turn of a Chat Session)
 When a session begins or resumes:
 1. **Load Active State**: Read `GAMEPLAY/status.json` and the latest turn in `TURNS/ACTIVE/` (e.g. `turn_0003.md`).
-2. **Read Campaign Directives**: Read `CAMPAIGNS/<campaign_id>/AGENTS.md` to load the campaign's setting register, prohibited/mandated vocabulary, protagonist profile, and world parameters.
+2. **Read Campaign Directives & Agent Channel**: Read `CAMPAIGNS/<campaign_id>/AGENTS.md` and `IDEAS/agent_channel.md` to load the campaign's setting register, protagonist profile, and latest autonomous steering directives from the Shadow Narrator.
 3. **Buffer the Scene Lore Bundle**: Read the current scene location in `WORLD_BIBLE/PLACES/` and active character files in `WORLD_BIBLE/PEOPLE/`.
    - *Why this guarantees quality*: Once loaded, these files stay in the LLM's active context window. You possess the full sensory descriptions, speech mannerisms, and world parameters without needing to fetch them again.
-4. **Internal Direction (5–10 Turn Compass)**: Map out the arc trajectory (e.g., current scene milestone $\rightarrow$ midday training $\rightarrow$ afternoon transit/obligation $\rightarrow$ evening routine closure).
+4. **Internal Direction (5–10 Turn Compass)**: Map out the arc trajectory incorporating any pending steering from the Shadow Narrator.
 
 ### B. In-Session Flow (Subsequent Warm Turns: Zero Degraded Quality, Zero Lag)
 * **Never Re-Read Existing Lore**: An LLM retains everything in its context window. Re-reading a file already present in the chat context adds zero quality; it only causes 10–20 seconds of unnecessary latency.
@@ -82,6 +87,7 @@ When a session begins or resumes:
    - Update `GAMEPLAY/status.json` (turn number, tracked vitals, scene_anchor).
    - Update `GAMEPLAY/status.md` (turn number, tracked vitals, scene_anchor).
    - If items or relations changed, update `items.json`/`items.md` and `relations.json`/`relations.md`.
+   - **Inter-Narrator Milestone Sync**: If a scene transition, clock advancement, or major milestone occurred, append an update to `CAMPAIGNS/<campaign_id>/IDEAS/agent_channel.md` (pruning so at most 5 messages per role are retained).
    - **Global Batch Archival Rule**: When `ACTIVE/` reaches **20 turns**, move the oldest **5 turns** into `TURNS/ARCHIVE/` in a single batch (resetting `ACTIVE/` to 15 turns). For turns 16–19, leave all active turns untouched without moving files.
 6. **Present Response to Player**:
    - Output the formatted turn directly to the player in chat.
