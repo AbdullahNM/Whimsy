@@ -20,6 +20,9 @@ from typing import Dict, List, Optional, Any
 DEFAULT_MAX_PER_SENDER = 5
 CHANNEL_FILENAME_MD = "agent_channel.md"
 CHANNEL_FILENAME_JSON = "agent_channel.json"
+CHANNEL_MODE_FILE = "file"
+CHANNEL_MODE_HYBRID = "hybrid"
+VALID_CHANNEL_MODES = [CHANNEL_MODE_FILE, CHANNEL_MODE_HYBRID]
 
 
 def normalize_sender(sender: str) -> str:
@@ -142,31 +145,71 @@ class AgentChannelManager:
     """
     Manages reading, posting to, and pruning the inter-narrator communication channel
     for a given campaign directory.
+
+    Supports two channel_modes (configured via flag, defaulting to 'file'):
+    - 'file': Standard direct disk read/write on IDEAS/agent_channel.md (safest, lowest interference).
+    - 'hybrid': In-memory event cache for sub-millisecond response, always flushing
+      to the file fallback (IDEAS/agent_channel.md) on every write.
     """
-    def __init__(self, campaign_dir: str):
+    def __init__(self, campaign_dir: str, channel_mode: Optional[str] = None):
         self.campaign_dir = campaign_dir
         self.ideas_dir = os.path.join(campaign_dir, "IDEAS")
         self.md_path = os.path.join(self.ideas_dir, CHANNEL_FILENAME_MD)
         self.json_path = os.path.join(self.ideas_dir, CHANNEL_FILENAME_JSON)
 
-    def load_messages(self) -> List[Dict[str, Any]]:
-        """Loads messages from JSON if available, else parses Markdown."""
+        # Flag selection: explicitly passed > campaign_config.json > env > default 'file'
+        if channel_mode and channel_mode in VALID_CHANNEL_MODES:
+            self.channel_mode = channel_mode
+        else:
+            self.channel_mode = self._detect_channel_mode()
+
+        self._in_memory_cache: Optional[List[Dict[str, Any]]] = None
+
+    def _detect_channel_mode(self) -> str:
+        # Check campaign_config.json
+        cfg_path = os.path.join(self.campaign_dir, "campaign_config.json")
+        if os.path.exists(cfg_path):
+            try:
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                    mode = cfg.get("channel_mode")
+                    if mode in VALID_CHANNEL_MODES:
+                        return mode
+            except Exception:
+                pass
+
+        env_mode = os.environ.get("WHIMSY_CHANNEL_MODE", "").lower().strip()
+        if env_mode in VALID_CHANNEL_MODES:
+            return env_mode
+
+        return CHANNEL_MODE_FILE
+
+    def load_messages(self, force_disk: bool = False) -> List[Dict[str, Any]]:
+        """Loads messages from in-memory cache if hybrid and not force_disk, else from disk."""
+        if not force_disk and self.channel_mode == CHANNEL_MODE_HYBRID and self._in_memory_cache is not None:
+            return list(self._in_memory_cache)
+
+        # File fallback: load from JSON if available, else parse Markdown
+        messages = []
         if os.path.exists(self.json_path):
             try:
                 with open(self.json_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    return data.get("messages", [])
+                    messages = data.get("messages", [])
             except Exception:
-                pass
+                messages = []
 
-        if os.path.exists(self.md_path):
+        if not messages and os.path.exists(self.md_path):
             try:
                 with open(self.md_path, "r", encoding="utf-8") as f:
-                    return parse_channel_markdown(f.read())
+                    messages = parse_channel_markdown(f.read())
             except Exception:
-                pass
+                messages = []
 
-        return []
+        if self.channel_mode == CHANNEL_MODE_HYBRID:
+            self._in_memory_cache = list(messages)
+
+        return messages
 
     def post_message(
         self,
@@ -204,8 +247,9 @@ class AgentChannelManager:
 
         messages.append(new_msg)
         pruned_messages = prune_channel_messages(messages, max_per_sender=max_per_sender)
+        self._in_memory_cache = list(pruned_messages)
 
-        # Write to Markdown
+        # File Fallback: Always write to Markdown and JSON regardless of mode
         md_content = format_channel_markdown(pruned_messages, campaign_id=os.path.basename(self.campaign_dir))
         with open(self.md_path, "w", encoding="utf-8") as f:
             f.write(md_content)
