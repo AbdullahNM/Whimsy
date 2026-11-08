@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OutcomeSchema",
+  "description": "Deterministic Outcome produced by Core.resolve carrying all mechanical mutations, events, and next state.",
+  "type": "object",
+  "required": [
+    "version",
+    "effects",
+    "events",
+    "clocks_advanced",
+    "progression_delta",
+    "resources_delta",
+    "offered_choices",
+    "next_state"
+  ],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Outcome schema version number."
+    },
+    "effects": {
+      "type": "array",
+      "description": "Explicit list of mechanical mutations and state changes applied.",
+      "items": {
+        "type": "object"
+      }
+    },
+    "events": {
+      "type": "array",
+      "description": "Triggered events such as filled clocks or scheduled milestones.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "clocks_advanced": {
+      "type": "array",
+      "description": "Event and pressure clocks advanced during this turn.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "delta",
+          "current",
+          "max"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "delta": {
+            "type": "integer"
+          },
+          "previous": {
+            "type": "integer"
+          },
+          "current": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "max": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "fired": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "progression_delta": {
+      "type": "object",
+      "description": "Changes to progression metrics (energy, stress, xp, checkpoints)."
+    },
+    "resources_delta": {
+      "type": "object",
+      "description": "Changes to currency and consumable resources."
+    },
+    "offered_choices": {
+      "type": "array",
+      "description": "Choices offered for the subsequent turn.",
+      "items": {
+        "type": "object",
+        "required": [
+          "index",
+          "text"
+        ],
+        "properties": {
+          "index": {
+            "type": "integer"
+          },
+          "text": {
+            "type": "string"
+          },
+          "raw": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "next_state": {
+      "type": "object",
+      "description": "Authoritative next public state dictionary for the campaign."
+    }
+  }
+}

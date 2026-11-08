@@ -96,6 +96,8 @@ class TestSchemas(unittest.TestCase):
             cls.turn_state_schema = json.load(f)
         with open(os.path.join(cls.schemas_dir, "world_foundation.schema.json"), "r") as f:
             cls.world_foundation_schema = json.load(f)
+        with open(os.path.join(cls.schemas_dir, "outcome.schema.json"), "r") as f:
+            cls.outcome_schema = json.load(f)
 
     def _load_json(self, rel_path: str) -> dict:
         full_path = os.path.join(ROOT_DIR, rel_path)
@@ -240,6 +242,31 @@ class TestSchemas(unittest.TestCase):
             }
         }
         errors = SimpleSchemaValidator.validate(bad_status, self.turn_state_schema)
+        self.assertTrue(any("missing required property" in e for e in errors))
+
+    # --- Outcome Schema Tests ---
+
+    def test_outcome_schema_valid(self):
+        valid_outcome = {
+            "version": 1,
+            "effects": [{"type": "stat_change", "target": "energy", "delta": -5}],
+            "events": ["Clock filled: deadline"],
+            "clocks_advanced": [{"id": "deadline", "delta": 1, "previous": 3, "current": 4, "max": 4, "fired": True}],
+            "progression_delta": {"energy": -5},
+            "resources_delta": {"credits": 50},
+            "offered_choices": [{"index": 1, "text": "Continue onward"}],
+            "next_state": {"turn": 2}
+        }
+        errors = SimpleSchemaValidator.validate(valid_outcome, self.outcome_schema)
+        self.assertEqual(errors, [], f"Expected outcome to be valid, got: {errors}")
+
+    def test_outcome_schema_missing_required_fails(self):
+        invalid_outcome = {
+            "version": 1,
+            "effects": [],
+            "events": []
+        }
+        errors = SimpleSchemaValidator.validate(invalid_outcome, self.outcome_schema)
         self.assertTrue(any("missing required property" in e for e in errors))
 
 

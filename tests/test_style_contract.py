@@ -276,6 +276,39 @@ class TestStyleContractValidator(unittest.TestCase):
         self.assertEqual(validator.config.get("max_sentence_words"), 35)
         self.assertTrue(validator.config.get("ban_stem_calculus_jargon"))
 
+    # --- 10. Fourth-Wall Seal State Change Validation (R6) ---
+
+    def test_uncontained_xp_receipt_fails_fourth_wall_seal(self):
+        from ENGINE.outcome import Outcome
+        outcome = Outcome(progression_delta={"energy": -5}, version=1)
+        prose = (
+            "You secure the perimeter latch with a firm turn.\n\n"
+            "[XP RESOLUTION: Previous: 100 | Delta: +50 (Combat) | New Total: 150 / 200]"
+        )
+        is_compliant, vios, score = self.validator.validate_prose(prose, outcome=outcome)
+        self.assertFalse(is_compliant)
+        self.assertTrue(any("Fourth-wall seal violation" in v for v in vios))
+        self.assertTrue(any("progression delta (50) not contained in outcome" in v for v in vios))
+
+    def test_matching_xp_receipt_passes_fourth_wall_seal(self):
+        from ENGINE.outcome import Outcome
+        outcome = Outcome(progression_delta={"xp": 50}, version=1)
+        prose = (
+            "You secure the perimeter latch with a firm turn.\n\n"
+            "[XP RESOLUTION: Previous: 100 | Delta: +50 (Combat) | New Total: 150 / 200]"
+        )
+        is_compliant, vios, score = self.validator.validate_prose(prose, outcome=outcome)
+        self.assertTrue(is_compliant, f"Expected compliant but got violations: {vios}")
+
+    def test_uncontained_diegetic_stat_assertion_fails_fourth_wall_seal(self):
+        from ENGINE.outcome import Outcome
+        outcome = Outcome(progression_delta={}, resources_delta={}, version=1)
+        prose = "You defeated the intruder and earned 500 gold for your valiant efforts."
+        is_compliant, vios, score = self.validator.validate_prose(prose, outcome=outcome)
+        self.assertFalse(is_compliant)
+        self.assertTrue(any("Fourth-wall seal violation" in v for v in vios))
+        self.assertTrue(any("currency gain (500) not contained in outcome" in v for v in vios))
+
 
 if __name__ == "__main__":
     unittest.main()

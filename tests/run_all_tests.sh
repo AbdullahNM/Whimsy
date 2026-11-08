@@ -38,7 +38,7 @@ echo -e "\n${GREEN}✔ Python Engine Test Suite: PASSED${NC}\n"
 # 2. JavaScript / UI Engine Test Suite (Node.js)
 # ------------------------------------------------------------------------------
 echo -e "${BOLD}${YELLOW}=== [2/2] Running JavaScript & UI Engine Tests (node --test) ===${NC}"
-node --test tests/test_markdown_parser.js tests/test_metrics_extractor.js
+node --test tests/test_markdown_parser.js tests/test_metrics_extractor.js tests/test_core_parity.js
 
 echo -e "\n${GREEN}✔ JavaScript & UI Engine Test Suite: PASSED${NC}\n"
 
