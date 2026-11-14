@@ -16,3 +16,7 @@ takeout_extracted/
 
 .worktrees/
 worktrees/
+
+# ---- Distribution builds (local artifacts, never published to repo) ----
+dist/*
+!dist/README.md
