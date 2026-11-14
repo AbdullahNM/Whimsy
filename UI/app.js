@@ -25,7 +25,7 @@ let campaignData = {
 };
 
 // Register Service Worker for PWA / Mobile Install
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && (typeof window === 'undefined' || !window.__INLINED_BUILD__)) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js')
       .then(reg => console.log('PWA ServiceWorker registered:', reg.scope))
@@ -319,12 +319,17 @@ async function getStoredHandle() {
 // Load Campaign Configs & Initial Gameplay Data
 async function loadInitialData() {
   try {
-    const [confRes, gameRes] = await Promise.all([
-      fetch('campaign_configs.json'),
-      fetch('gameplay_manifest.json')
-    ]);
-    campaignConfigs = await confRes.json();
-    gameplayManifest = await gameRes.json();
+    if (typeof window !== 'undefined' && window.__CAMPAIGN_CONFIGS__ && window.__GAMEPLAY_MANIFEST__) {
+      campaignConfigs = window.__CAMPAIGN_CONFIGS__;
+      gameplayManifest = window.__GAMEPLAY_MANIFEST__;
+    } else {
+      const [confRes, gameRes] = await Promise.all([
+        fetch('campaign_configs.json'),
+        fetch('gameplay_manifest.json')
+      ]);
+      campaignConfigs = await confRes.json();
+      gameplayManifest = await gameRes.json();
+    }
 
     // 1. Populate campaign dropdown dynamically from loaded configs
     if (campaignSelect) {
@@ -1360,8 +1365,12 @@ const loreArticleContent = document.getElementById('lore-article-content');
 
 async function initWorldBible() {
   try {
-    const res = await fetch('world_bible_data.json');
-    worldBibleData = await res.json();
+    if (typeof window !== 'undefined' && window.__WORLD_BIBLE_DATA__) {
+      worldBibleData = window.__WORLD_BIBLE_DATA__;
+    } else {
+      const res = await fetch('world_bible_data.json');
+      worldBibleData = await res.json();
+    }
     populateLoreCategories();
     if (loreCategorySelect && loreCategorySelect.value) {
       renderWorldBibleCategory(loreCategorySelect.value);
