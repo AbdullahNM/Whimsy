@@ -10,7 +10,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const { Core, Outcome } = require('../UI/core/deterministic_core.js');
 
-test('Core Parity - Shared Fixture Corpus Equivalence', (t) => {
+test('Core Parity - Shared Fixture Corpus Equivalence', async (t) => {
   const fixturesDir = path.resolve(__dirname, 'fixtures/outcomes');
   const files = fs.readdirSync(fixturesDir).filter(f => f.endsWith('.json')).sort();
 
@@ -27,7 +27,7 @@ test('Core Parity - Shared Fixture Corpus Equivalence', (t) => {
   }
 
   for (const file of files) {
-    t.test(`Fixture: ${file}`, () => {
+    await t.test(`Fixture: ${file}`, () => {
       const content = fs.readFileSync(path.join(fixturesDir, file), 'utf8');
       const fix = JSON.parse(content);
       const outcome = Core.resolve(fix.state, fix.action, fix.config);
