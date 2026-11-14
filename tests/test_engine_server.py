@@ -189,31 +189,89 @@ class TestEngineServer(unittest.TestCase):
 
 
     def test_channel_api_endpoints(self):
-        # GET /api/channel
-        status, headers, resp_body = execute_request("GET", "/api/channel?campaign=template_campaign")
+        # Backup existing channel file
+        ideas_dir = os.path.join(ROOT_DIR, "CAMPAIGNS", "template_campaign", "IDEAS")
+        md_file = os.path.join(ideas_dir, "agent_channel.md")
+        json_file = os.path.join(ideas_dir, "agent_channel.json")
+        orig_md = None
+        if os.path.exists(md_file):
+            with open(md_file, "r", encoding="utf-8") as f:
+                orig_md = f.read()
+
+        try:
+            # GET /api/channel
+            status, headers, resp_body = execute_request("GET", "/api/channel?campaign=template_campaign")
+            self.assertEqual(status, 200)
+            data = json.loads(resp_body.decode("utf-8"))
+            self.assertEqual(data["channel_mode"], "file")
+            self.assertTrue(data["file_fallback"])
+            self.assertIn("messages", data)
+
+            # POST /api/channel
+            post_payload = {
+                "campaign": "template_campaign",
+                "sender": "SHADOW",
+                "content": "API test directive",
+                "turn": 1
+            }
+            status, headers, resp_body = execute_request(
+                "POST",
+                "/api/channel",
+                body=json.dumps(post_payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            self.assertEqual(status, 200)
+            post_data = json.loads(resp_body.decode("utf-8"))
+            self.assertEqual(post_data["status"], "success")
+            self.assertTrue(post_data["file_fallback"])
+        finally:
+            if orig_md is not None:
+                with open(md_file, "w", encoding="utf-8") as f:
+                    f.write(orig_md)
+            if os.path.exists(json_file):
+                try:
+                    os.remove(json_file)
+                except OSError:
+                    pass
+
+    def test_telemetry_get_endpoint(self):
+        status, headers, resp_body = execute_request("GET", "/telemetry?campaign=template_campaign")
         self.assertEqual(status, 200)
         data = json.loads(resp_body.decode("utf-8"))
-        self.assertEqual(data["channel_mode"], "file")
-        self.assertTrue(data["file_fallback"])
-        self.assertIn("messages", data)
+        self.assertEqual(data["campaign"], "template_campaign")
+        self.assertIn("summary", data)
+        self.assertIn("records", data)
 
-        # POST /api/channel
-        post_payload = {
+    def test_calibration_get_endpoint(self):
+        status, headers, resp_body = execute_request("GET", "/calibration?campaign=template_campaign")
+        self.assertEqual(status, 200)
+        data = json.loads(resp_body.decode("utf-8"))
+        self.assertEqual(data["campaign"], "template_campaign")
+        self.assertIn("calibration", data)
+        self.assertIn("health_status", data["calibration"])
+
+    def test_evaluate_turn_post_endpoint(self):
+        eval_payload = {
             "campaign": "template_campaign",
-            "sender": "SHADOW",
-            "content": "API test directive",
-            "turn": 1
+            "turn_num": 1,
+            "action": "Inspect the terminal",
+            "response": "You inspect the terminal carefully. 1. Press button. 2. Leave."
         }
         status, headers, resp_body = execute_request(
             "POST",
-            "/api/channel",
-            body=json.dumps(post_payload).encode("utf-8"),
+            "/evaluate/turn",
+            body=json.dumps(eval_payload).encode("utf-8"),
             headers={"Content-Type": "application/json"}
         )
         self.assertEqual(status, 200)
-        post_data = json.loads(resp_body.decode("utf-8"))
-        self.assertEqual(post_data["status"], "success")
-        self.assertTrue(post_data["file_fallback"])
+        data = json.loads(resp_body.decode("utf-8"))
+        self.assertEqual(data["campaign_id"], "template_campaign")
+        self.assertIn("overall_score", data)
+        self.assertIn("dimension_scores", data)
+        self.assertIn("evidence", data)
+        self.assertIn("critique", data)
+        self.assertIn("remedy", data)
+        self.assertIn("bias_adjustments", data)
 
 
 if __name__ == "__main__":

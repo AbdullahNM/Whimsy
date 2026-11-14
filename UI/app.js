@@ -2288,6 +2288,76 @@ function updateShadowNarratorView() {
     const steering = campaignData.narrativeSteering || '# Narrative Steering\n\nNo steering notes recorded for this campaign.';
     renderEl.innerHTML = renderMarkdown(steering);
   }
+
+  const campaign = campaignSelect ? campaignSelect.value : 'template_campaign';
+  updateShadowTelemetryAndCalibration(campaign);
+}
+
+async function updateShadowTelemetryAndCalibration(campaign) {
+  try {
+    const telRes = await fetch(`http://localhost:8000/telemetry?campaign=${encodeURIComponent(campaign)}`);
+    if (telRes.ok) {
+      const telData = await telRes.json();
+      const summary = telData.summary || {};
+      const turnsEl = document.getElementById('shadow-telemetry-turns');
+      const latencyEl = document.getElementById('shadow-telemetry-latency');
+      const tokensEl = document.getElementById('shadow-telemetry-tokens');
+      const violationsEl = document.getElementById('shadow-telemetry-violations');
+
+      if (turnsEl) turnsEl.textContent = summary.total_turns !== undefined ? summary.total_turns : 0;
+      if (latencyEl) latencyEl.textContent = `${summary.avg_latency_ms || 0}ms`;
+      if (tokensEl) {
+        const avgComp = summary.token_budgets?.avg_completion_tokens || 0;
+        tokensEl.textContent = `${avgComp} tok`;
+      }
+      if (violationsEl) {
+        const totalV = summary.style_violation_frequency?.total_violations || 0;
+        violationsEl.textContent = totalV;
+      }
+    }
+  } catch (err) {
+    // Engine server offline or telemetry unavailable
+  }
+
+  try {
+    const calRes = await fetch(`http://localhost:8000/calibration?campaign=${encodeURIComponent(campaign)}`);
+    if (calRes.ok) {
+      const calData = await calRes.json();
+      const calib = calData.calibration || {};
+      const statusEl = document.getElementById('shadow-calib-status');
+      const groundingEl = document.getElementById('shadow-calib-grounding');
+      const continuityEl = document.getElementById('shadow-calib-continuity');
+      const pacingEl = document.getElementById('shadow-calib-pacing');
+      const styleEl = document.getElementById('shadow-calib-style');
+      const steeringEl = document.getElementById('shadow-calib-steering');
+      const advBox = document.getElementById('shadow-calibration-advisory');
+
+      if (statusEl) {
+        const status = (calib.health_status || 'HEALTHY').toUpperCase();
+        statusEl.textContent = status;
+        statusEl.style.color = status === 'HEALTHY' ? '#7ee787' : (status === 'WARNING' ? '#e3b341' : '#f85149');
+      }
+
+      const dims = calib.dimension_averages || {};
+      if (groundingEl) groundingEl.textContent = dims.world_grounding !== undefined ? dims.world_grounding.toFixed(1) : '5.0';
+      if (continuityEl) continuityEl.textContent = dims.tactical_continuity !== undefined ? dims.tactical_continuity.toFixed(1) : '5.0';
+      if (pacingEl) pacingEl.textContent = dims.pacing_alignment !== undefined ? dims.pacing_alignment.toFixed(1) : '5.0';
+      if (styleEl) styleEl.textContent = dims.style_contract_adherence !== undefined ? dims.style_contract_adherence.toFixed(1) : '5.0';
+      if (steeringEl) steeringEl.textContent = dims.shadow_gm_steering !== undefined ? dims.shadow_gm_steering.toFixed(1) : '5.0';
+
+      if (advBox) {
+        if (calib.advisory_prompt) {
+          advBox.classList.remove('hidden');
+          advBox.textContent = calib.advisory_prompt;
+        } else {
+          advBox.classList.add('hidden');
+          advBox.textContent = '';
+        }
+      }
+    }
+  } catch (err) {
+    // Engine server offline or calibration unavailable
+  }
 }
 
 function setupShadowNarrator() {

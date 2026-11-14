@@ -20,6 +20,7 @@ CORS enabled for local web and PWA clients.
 import os
 import sys
 import json
+import time
 import copy
 import urllib.request
 import urllib.error
@@ -100,6 +101,30 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
                 ]
             }
             self.wfile.write(json.dumps(models_data).encode("utf-8"))
+        elif self.path.startswith("/telemetry") or self.path.startswith("/api/telemetry"):
+            from urllib.parse import urlparse, parse_qs
+            from ENGINE.telemetry import get_campaign_telemetry_summary, read_campaign_telemetry
+            query = parse_qs(urlparse(self.path).query)
+            campaign = query.get("campaign", ["template_campaign"])[0]
+            summary = get_campaign_telemetry_summary(ROOT_DIR, campaign)
+            records = read_campaign_telemetry(ROOT_DIR, campaign)
+            self._set_cors_headers(200)
+            self.wfile.write(json.dumps({
+                "campaign": campaign,
+                "summary": summary,
+                "records": records
+            }).encode("utf-8"))
+        elif self.path.startswith("/calibration") or self.path.startswith("/api/calibration"):
+            from urllib.parse import urlparse, parse_qs
+            from ENGINE.calibration import get_calibration_advisory
+            query = parse_qs(urlparse(self.path).query)
+            campaign = query.get("campaign", ["template_campaign"])[0]
+            advisory = get_calibration_advisory(ROOT_DIR, campaign)
+            self._set_cors_headers(200)
+            self.wfile.write(json.dumps({
+                "campaign": campaign,
+                "calibration": advisory.to_dict()
+            }).encode("utf-8"))
         elif self.path.startswith("/api/channel"):
             from urllib.parse import urlparse, parse_qs
             from ENGINE.agent_channel import AgentChannelManager
@@ -133,6 +158,7 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         if self.path in ["/generate", "/v1/chat/completions", "/api/turn"]:
+            t_gen_start = time.time()
             content_length = int(self.headers.get("Content-Length", 0))
             body_bytes = self.rfile.read(content_length)
             try:
@@ -388,6 +414,31 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
                         }
                     )
 
+            # Record telemetry event
+            try:
+                if should_commit:
+                    from ENGINE.telemetry import record_turn_telemetry
+                gen_latency = (time.time() - t_gen_start) * 1000
+                pmt_tokens = int(len(system_prompt.split()) * 1.3) if 'system_prompt' in locals() and system_prompt else 0
+                cmp_tokens = int(len(response_text.split()) * 1.3) if response_text else 0
+                record_turn_telemetry(
+                    root_dir=workspace_root,
+                    campaign_id=campaign or "template_campaign",
+                    turn=turn_num,
+                    latency_ms=gen_latency,
+                    model=payload.get("model") or "local-heuristic",
+                    operational_mode=mode,
+                    zoom_level=updated_pacing.get("zoom_level", proposed_zoom),
+                    narrative_intensity=updated_pacing.get("narrative_intensity", proposed_intensity),
+                    prompt_tokens=pmt_tokens,
+                    completion_tokens=cmp_tokens,
+                    retrieval_hits=len(triggered_events) if triggered_events else 0,
+                        style_violations=violations if violations else [],
+                        outcome_state_delta=outcome.to_dict() if outcome else {}
+                    )
+            except Exception as tel_err:
+                pass
+
             self._set_cors_headers(200)
             self.wfile.write(json.dumps({
                 "response": response_text,
@@ -501,6 +552,36 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._set_cors_headers(500)
                 self.wfile.write(json.dumps({"error": f"Failed to scaffold campaign: {str(e)}"}).encode("utf-8"))
+
+        elif self.path in ["/evaluate/turn", "/api/evaluate/turn"]:
+            content_len = int(self.headers.get("Content-Length", 0))
+            raw_body = self.rfile.read(content_len)
+            try:
+                payload = json.loads(raw_body.decode("utf-8"))
+            except Exception as e:
+                self._set_cors_headers(400)
+                self.wfile.write(json.dumps({"error": f"Invalid JSON payload: {str(e)}"}).encode("utf-8"))
+                return
+
+            campaign = payload.get("campaign", payload.get("campaign_id", "template_campaign"))
+            turn_num = payload.get("turn_num", payload.get("turn", 1))
+            action = payload.get("action", "")
+            response = payload.get("response", payload.get("gm_response", ""))
+
+            try:
+                from ENGINE.evaluator import Evaluator
+                evaluator = Evaluator(ROOT_DIR)
+                report = evaluator.evaluate_turn(
+                    campaign_id=campaign,
+                    turn_num=int(turn_num),
+                    action=action,
+                    response=response
+                )
+                self._set_cors_headers(200)
+                self.wfile.write(json.dumps(report.to_dict()).encode("utf-8"))
+            except Exception as e:
+                self._set_cors_headers(500)
+                self.wfile.write(json.dumps({"error": f"Evaluation error: {str(e)}"}).encode("utf-8"))
 
         elif self.path in ["/shadow/consult", "/api/shadow/consult"]:
             content_len = int(self.headers.get("Content-Length", 0))

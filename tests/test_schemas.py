@@ -100,6 +100,8 @@ class TestSchemas(unittest.TestCase):
             cls.outcome_schema = json.load(f)
         with open(os.path.join(cls.schemas_dir, "story_graph.schema.json"), "r") as f:
             cls.story_graph_schema = json.load(f)
+        with open(os.path.join(cls.schemas_dir, "evaluation_rubric.schema.json"), "r") as f:
+            cls.evaluation_rubric_schema = json.load(f)
 
     def _load_json(self, rel_path: str) -> dict:
         full_path = os.path.join(ROOT_DIR, rel_path)
@@ -321,6 +323,15 @@ class TestSchemas(unittest.TestCase):
         }
         errors = SimpleSchemaValidator.validate(invalid_graph, self.story_graph_schema)
         self.assertTrue(any("missing required property" in e for e in errors))
+
+
+    # --- Evaluation Rubric Schema Tests ---
+
+    def test_narrator_evaluation_rubric_json(self):
+        rubric = self._load_json("GLOBAL/RUBRICS/narrator_evaluation_rubric.json")
+        errors = SimpleSchemaValidator.validate(rubric, self.evaluation_rubric_schema)
+        self.assertEqual(errors, [], f"Evaluation rubric schema errors: {errors}")
+        self.assertEqual(rubric["rubric_id"], "narrator_turn_evaluation_v1")
 
 
 if __name__ == "__main__":

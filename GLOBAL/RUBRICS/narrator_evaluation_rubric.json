@@ -1,0 +1,78 @@
+{
+  "schema_version": "1.0.0",
+  "rubric_id": "narrator_turn_evaluation_v1",
+  "name": "Narrator Quality & Agent Calibration Rubric",
+  "description": "Standardized 5-dimension rubric evaluating narrative turns for world grounding, tactical continuity, pacing alignment, style contract adherence, and shadow GM steering.",
+  "scale": {
+    "min": 1,
+    "max": 5,
+    "type": "likert"
+  },
+  "dimensions": [
+    {
+      "id": "world_grounding",
+      "name": "World Grounding",
+      "description": "Adherence to World Bible facts, established factions, locations, and NPC epistemic horizons without canon leaks.",
+      "weight": 0.25,
+      "score_anchors": {
+        "1": "Poor: Blatant lore contradictions, severe anachronisms, or leaking canon secrets to protagonist unearned.",
+        "2": "Subpar: Notable factual drift or ungrounded inventions that clash with world constraints.",
+        "3": "Acceptable: Consistent with known facts, references local atmosphere, no secrets leaked, but minor omissions or generic staging.",
+        "4": "Strong: Grounded in canon details, clear faction perspectives, solid spatial and lore consistency.",
+        "5": "Exemplary: Flawless adherence to canon, vivid faction nuances, strict NPC knowledge horizons, deep epistemic consistency."
+      }
+    },
+    {
+      "id": "tactical_continuity",
+      "name": "Tactical Continuity",
+      "description": "Causal outcome fidelity directly resolving the player's chosen action and reflecting immediate ripples.",
+      "weight": 0.25,
+      "score_anchors": {
+        "1": "Poor: Completely ignores player action, hallucinates unrelated outcome, or resolves disconnected events.",
+        "2": "Subpar: Loose connection to player action; skips immediate causal link or introduces disjointed shifts.",
+        "3": "Acceptable: Directly acknowledges player action and produces logical immediate outcome, though secondary consequences are minimal.",
+        "4": "Strong: Clear, logical causal progression with immediate and secondary ripples reflecting player tactical choices.",
+        "5": "Exemplary: Immediate, nuanced causal consequences stemming from player intent, physics, spatial proximity, and tactical context."
+      }
+    },
+    {
+      "id": "pacing_alignment",
+      "name": "Pacing Alignment",
+      "description": "Compliance with Adaptive Narrative Focus Controller zoom level (detailed_scene, short_summary, montage, time_skip) and intensity scale (1-5).",
+      "weight": 0.15,
+      "score_anchors": {
+        "1": "Poor: Complete zoom mismatch (e.g. verbose second-by-second text for time skip, or skipping key action during detailed combat).",
+        "2": "Subpar: Noticeable pacing friction; sluggish scene progress or abrupt tonal shifts mismatched with target intensity.",
+        "3": "Acceptable: Generally matches target zoom level and intensity band with adequate narrative compression or dilation.",
+        "4": "Strong: Well-calibrated scene scale and intensity curve with appropriate temporal momentum.",
+        "5": "Exemplary: Masterful pacing calibration exactly matching specified zoom mechanics, temporal passage, and narrative tension."
+      }
+    },
+    {
+      "id": "style_contract_adherence",
+      "name": "Style Contract Adherence",
+      "description": "Clean, grounded, sensory prose without purple prose, calculus/optimization jargon, narrator praise, or modern conversationalisms.",
+      "weight": 0.20,
+      "score_anchors": {
+        "1": "Poor: Riddled with purple prose ('tapestry of shadows', 'cacophony'), immersion-breaking mathematical jargon, or patronizing narrator praise.",
+        "2": "Subpar: Multiple stylistic lapses, purple prose flourishes, or meta-commentary breaking third-person immersion.",
+        "3": "Acceptable: Grounded tone with minimal style contract violations; readable and mostly atmospheric.",
+        "4": "Strong: Crisp, evocative prose adhering cleanly to tone and vocabulary boundaries.",
+        "5": "Exemplary: Razor-sharp, grounded, atmospheric sensory prose adhering 100% to style contract with zero banned tropes or praise."
+      }
+    },
+    {
+      "id": "shadow_gm_steering",
+      "name": "Shadow GM Steering",
+      "description": "Alignment with active narrative trajectory, pressure clocks, and upcoming hooks without railroading the player.",
+      "weight": 0.15,
+      "score_anchors": {
+        "1": "Poor: Hard railroading, nullifying player agency, or ignoring active ticking clocks and narrative tension entirely.",
+        "2": "Subpar: Weak forward momentum; passive stagnation or overly coercive choice constraints.",
+        "3": "Acceptable: Weaves active pressure and scene objectives while offering distinct, valid tactical choices.",
+        "4": "Strong: Proactive narrative tension with organic integration of impending clocks and meaningful player leverage.",
+        "5": "Exemplary: Organic escalation of narrative pressure, seamless clock signaling, providing high-agency consequential choices."
+      }
+    }
+  ]
+}

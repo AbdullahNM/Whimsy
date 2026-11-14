@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EvaluationRubricSchema",
+  "description": "Standardized Multi-dimensional Evaluation Rubric Schema for Narrator and Agent Quality Assessment.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "rubric_id",
+    "name",
+    "description",
+    "scale",
+    "dimensions"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Semver version of the rubric schema."
+    },
+    "rubric_id": {
+      "type": "string",
+      "description": "Unique identifier for the evaluation rubric."
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable name of the rubric."
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed explanation of the rubric scope and purpose."
+    },
+    "scale": {
+      "type": "object",
+      "required": [
+        "min",
+        "max",
+        "type"
+      ],
+      "properties": {
+        "min": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "likert",
+            "continuous",
+            "binary"
+          ]
+        }
+      }
+    },
+    "dimensions": {
+      "type": "array",
+      "description": "Calibrated scoring dimensions.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "weight",
+          "score_anchors"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0
+          },
+          "score_anchors": {
+            "type": "object",
+            "required": [
+              "1",
+              "3",
+              "5"
+            ],
+            "properties": {
+              "1": {
+                "type": "string"
+              },
+              "2": {
+                "type": "string"
+              },
+              "3": {
+                "type": "string"
+              },
+              "4": {
+                "type": "string"
+              },
+              "5": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

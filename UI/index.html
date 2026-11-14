@@ -148,6 +148,27 @@
                   <span class="shadow-badge">Clock: <strong id="shadow-val-clock">Day 1, 08:00</strong></span>
                 </div>
               </div>
+              <div class="shadow-section" id="shadow-calibration-card">
+                <div class="shadow-section-label">Agent Calibration & Health</div>
+                <div class="shadow-badges-row">
+                  <span class="shadow-badge" id="shadow-calib-status-badge">Health: <strong id="shadow-calib-status">HEALTHY</strong></span>
+                  <span class="shadow-badge">Grounding: <strong id="shadow-calib-grounding">5.0</strong></span>
+                  <span class="shadow-badge">Continuity: <strong id="shadow-calib-continuity">5.0</strong></span>
+                  <span class="shadow-badge">Pacing: <strong id="shadow-calib-pacing">5.0</strong></span>
+                  <span class="shadow-badge">Style: <strong id="shadow-calib-style">5.0</strong></span>
+                  <span class="shadow-badge">Steering: <strong id="shadow-calib-steering">5.0</strong></span>
+                </div>
+                <div id="shadow-calibration-advisory" class="shadow-advisory-box hidden" style="margin-top: 8px; font-size: 11px; padding: 6px 10px; background: rgba(255, 171, 0, 0.1); border: 1px solid rgba(255, 171, 0, 0.3); border-radius: 4px; color: #e6b450; white-space: pre-wrap;"></div>
+              </div>
+              <div class="shadow-section" id="shadow-telemetry-card">
+                <div class="shadow-section-label">Telemetry & Observability</div>
+                <div class="shadow-badges-row">
+                  <span class="shadow-badge">Total Turns: <strong id="shadow-telemetry-turns">0</strong></span>
+                  <span class="shadow-badge">Avg Latency: <strong id="shadow-telemetry-latency">0ms</strong></span>
+                  <span class="shadow-badge">Avg Completion: <strong id="shadow-telemetry-tokens">0 tok</strong></span>
+                  <span class="shadow-badge">Style Violations: <strong id="shadow-telemetry-violations">0</strong></span>
+                </div>
+              </div>
               <div class="shadow-section">
                 <div class="shadow-section-label">Narrative Steering & Objectives</div>
                 <div id="shadow-steering-render" class="markdown-body">
