@@ -236,6 +236,51 @@ const DB_NAME = 'CYOA_ENGINE_DB';
 const DB_VERSION = 1;
 const STORE_NAME = 'handles';
 
+
+// Toast Notification Utility
+function showToast(message, type = 'info', duration = 4000) {
+  const existing = document.querySelector('.toast-alert');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.className = `toast-alert toast-${type}`;
+  toast.innerHTML = `<span>${escapeHtml(message)}</span><button style="background:none;border:none;color:#fff;cursor:pointer;margin-left:8px;font-size:14px;line-height:1;" onclick="this.parentElement.remove()">✕</button>`;
+  document.body.appendChild(toast);
+  setTimeout(() => { if (toast.parentElement) toast.remove(); }, duration);
+}
+
+// Strict Workspace Validation
+async function validateWorkspaceHandle(handle) {
+  if (!handle) return false;
+  try {
+    // 1. Check if handle contains CAMPAIGNS subdirectory with at least one folder
+    try {
+      const campaignsDir = await handle.getDirectoryHandle('CAMPAIGNS');
+      for await (const entry of campaignsDir.values()) {
+        if (entry.kind === 'directory' && !entry.name.startsWith('.')) {
+          return { type: 'workspace_root', handle };
+        }
+      }
+    } catch (e) {}
+
+    // 2. Check if handle itself contains campaign_config.json
+    try {
+      await handle.getFileHandle('campaign_config.json');
+      return { type: 'campaign_dir', handle };
+    } catch (e) {}
+
+    // 3. Check if handle contains GAMEPLAY and TURNS folders
+    try {
+      await handle.getDirectoryHandle('GAMEPLAY');
+      await handle.getDirectoryHandle('TURNS');
+      return { type: 'campaign_dir', handle };
+    } catch (e) {}
+
+    return false;
+  } catch (err) {
+    return false;
+  }
+}
+
 function openHandleDB() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -305,8 +350,10 @@ async function loadInitialData() {
     // Check for existing stored folder handle
     const storedHandle = await getStoredHandle();
     if (storedHandle) {
-      dirHandle = storedHandle;
-      try {
+      const isValid = await validateWorkspaceHandle(storedHandle);
+      if (isValid) {
+        dirHandle = storedHandle;
+        try {
         let perm = await storedHandle.queryPermission({ mode: 'readwrite' });
         if (perm !== 'granted') {
           perm = await storedHandle.queryPermission({ mode: 'read' });
@@ -326,6 +373,7 @@ async function loadInitialData() {
         syncStatus.className = 'status-pill status-reconnect';
         syncStatus.title = 'Click to re-authorize workspace folder access';
       }
+      }
     }
   } catch (e) {
     console.error('Failed to load initial configs/manifest:', e);
@@ -337,6 +385,13 @@ async function attemptReconnect(handle) {
   try {
     const perm = await handle.requestPermission({ mode: 'readwrite' });
     if (perm === 'granted') {
+      const isValid = await validateWorkspaceHandle(handle);
+      if (!isValid) {
+        showToast("Stored folder is not a valid Whimsy workspace (missing CAMPAIGNS/ or campaign_config.json).", "error");
+        syncStatus.textContent = 'Invalid Folder';
+        syncStatus.className = 'status-pill status-disconnected';
+        return false;
+      }
       dirHandle = handle;
       syncStatus.textContent = handle.name;
       syncStatus.className = 'status-pill status-connected';
@@ -457,7 +512,11 @@ function applyActiveCampaignConfig() {
     const tabsContainer = document.querySelector('.sidebar-tabs');
     if (tabsContainer) {
       tabsContainer.innerHTML = '';
-      activeConfig.sidebar.tabs.forEach((tab, idx) => {
+      const tabList = [...activeConfig.sidebar.tabs];
+      if (!tabList.some(t => t.id === 'shadow-tab')) {
+        tabList.push({ id: 'shadow-tab', label: 'Shadow GM' });
+      }
+      tabList.forEach((tab, idx) => {
         const btn = document.createElement('button');
         btn.className = idx === 0 ? 'tab-btn active' : 'tab-btn';
         btn.dataset.tab = tab.id;
@@ -468,6 +527,7 @@ function applyActiveCampaignConfig() {
           btn.classList.add('active');
           const target = document.getElementById(tab.id);
           if (target) target.classList.add('active');
+          if (tab.id === 'shadow-tab') updateShadowNarratorView();
         });
         tabsContainer.appendChild(btn);
       });
@@ -504,6 +564,7 @@ function applyActiveCampaignConfig() {
 
   // 7. Update Evolution HUD (Mode badge, Focus pill, Clock)
   updateEvolutionHUD();
+  updateShadowNarratorView();
 }
 
 function updateEvolutionHUD(mode, zoom, time) {
@@ -1682,22 +1743,33 @@ function parseAndRenderNewChoices(text) {
   }
 }
 
-// File System Access & Multi-Campaign Workspace Loading
+// File System Access & Multi-Campaign Workspace Loading with strict validation
 folderPickerBtn.addEventListener('click', async () => {
   if (!window.showDirectoryPicker) {
     alert("File System Access API is not supported in this browser (common on mobile browsers). You can continue playing seamlessly with built-in manifest data and local engine sync!");
     return;
   }
   try {
-    dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    const validation = await validateWorkspaceHandle(handle);
+    if (!validation) {
+      showToast("Selected folder does not contain a valid Whimsy workspace (missing CAMPAIGNS/ or campaign_config.json).", "error", 6000);
+      syncStatus.textContent = 'Invalid Folder';
+      syncStatus.className = 'status-pill status-disconnected';
+      syncStatus.title = 'Selected folder is not a valid Whimsy workspace.';
+      return;
+    }
+    dirHandle = handle;
     syncStatus.textContent = dirHandle.name;
     syncStatus.className = 'status-pill status-connected';
     syncStatus.title = 'Workspace connected: ' + dirHandle.name;
     await saveStoredHandle(dirHandle);
     await loadWorkspace(dirHandle);
+    showToast(`Connected workspace: ${dirHandle.name}`, 'success');
   } catch (err) {
     if (err.name !== 'AbortError') {
       console.warn('Folder selection error:', err);
+      showToast(`Error accessing folder: ${err.message}`, 'error');
     }
   }
 });
@@ -2183,3 +2255,282 @@ function appendCard(header, htmlContent, isPlayer = false) {
   storyStream.scrollTop = storyStream.scrollHeight;
   return bodyEl;
 }
+
+
+// Shadow Narrator View & Consultation Handler
+function updateShadowNarratorView() {
+  const statusJson = campaignData.statusJson || {};
+  const pacingState = statusJson.pacing_state || {};
+  
+  const modeEl = document.getElementById('shadow-val-mode');
+  const zoomEl = document.getElementById('shadow-val-zoom');
+  const intensityEl = document.getElementById('shadow-val-intensity');
+  const clockEl = document.getElementById('shadow-val-clock');
+  
+  if (modeEl) {
+    const rawMode = statusJson.operational_mode || (activeConfig && activeConfig.operational_mode) || 'classic_cyoa';
+    modeEl.textContent = rawMode === 'classic_cyoa' ? 'Classic CYOA' : 'Freeform Sim';
+  }
+  if (zoomEl) {
+    const rawZoom = pacingState.zoom_level || 'detailed_scene';
+    zoomEl.textContent = rawZoom.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  }
+  if (intensityEl) {
+    const rawIntensity = pacingState.narrative_intensity !== undefined ? pacingState.narrative_intensity : 1;
+    intensityEl.textContent = `${rawIntensity}/5`;
+  }
+  if (clockEl) {
+    clockEl.textContent = pacingState.timeline_stamp || statusJson.timeline || 'Act I';
+  }
+
+  const renderEl = document.getElementById('shadow-steering-render');
+  if (renderEl) {
+    const steering = campaignData.narrativeSteering || '# Narrative Steering\n\nNo steering notes recorded for this campaign.';
+    renderEl.innerHTML = renderMarkdown(steering);
+  }
+}
+
+function setupShadowNarrator() {
+  const consultBtn = document.getElementById('shadow-consult-btn');
+  const queryInput = document.getElementById('shadow-query-input');
+  const resultBox = document.getElementById('shadow-consult-result');
+
+  async function handleConsult() {
+    if (!queryInput || !resultBox) return;
+    const query = queryInput.value.trim();
+    if (!query) return;
+
+    resultBox.classList.remove('hidden');
+    resultBox.innerHTML = '<em>Consulting Shadow Narrator...</em>';
+
+    const campaign = campaignSelect ? campaignSelect.value : 'template_campaign';
+    try {
+      const res = await fetch('http://localhost:8000/shadow/consult', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaign, query })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        resultBox.innerHTML = renderMarkdown(data.advice || 'No advice returned.');
+      } else {
+        throw new Error(`Server returned ${res.status}`);
+      }
+    } catch (err) {
+      const pacing = campaignData.statusJson?.pacing_state || {};
+      const zoom = pacing.zoom_level || 'detailed_scene';
+      const intensity = pacing.narrative_intensity !== undefined ? pacing.narrative_intensity : 1;
+      const advice = `🔮 **Shadow Narrator Advisory** (Offline Mode):\n\n- **Focus & Intensity**: ${zoom} • Level ${intensity}/5\n- **Query**: *${escapeHtml(query)}*\n\nMaintain causal continuity. Ground each narrative development in existing established facts and avoid unearned escalations.`;
+      resultBox.innerHTML = renderMarkdown(advice);
+    }
+  }
+
+  if (consultBtn) consultBtn.addEventListener('click', handleConsult);
+  if (queryInput) {
+    queryInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleConsult();
+    });
+  }
+}
+
+// Resizable & Collapsible Action Dock
+function setupDockResizer() {
+  const resizer = document.getElementById('dock-resizer');
+  const actionDock = document.getElementById('action-dock');
+  const toggleCollapseBtn = document.getElementById('toggle-dock-collapse-btn');
+  if (!resizer || !actionDock) return;
+
+  const savedHeight = localStorage.getItem('cyoa_dock_height');
+  if (savedHeight) {
+    const h = parseInt(savedHeight, 10);
+    if (!isNaN(h) && h >= 100 && h <= window.innerHeight * 0.8) {
+      actionDock.style.maxHeight = `${h}px`;
+      document.documentElement.style.setProperty('--dock-max-height', `${h}px`);
+    }
+  }
+
+  let isDragging = false;
+  let startY = 0;
+  let startHeight = 0;
+
+  function onPointerDown(e) {
+    isDragging = true;
+    startY = e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0].clientY) || 0;
+    startHeight = actionDock.getBoundingClientRect().height;
+    if (document.body && document.body.style) {
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'row-resize';
+    }
+  }
+
+  function onPointerMove(e) {
+    if (!isDragging) return;
+    const clientY = e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0].clientY) || 0;
+    const delta = startY - clientY;
+    const minH = 100;
+    const maxH = typeof window !== 'undefined' && window.innerHeight ? Math.floor(window.innerHeight * 0.75) : 400;
+    const newH = Math.max(minH, Math.min(maxH, startHeight + delta));
+    actionDock.style.maxHeight = `${newH}px`;
+    if (document.documentElement && document.documentElement.style) {
+      document.documentElement.style.setProperty('--dock-max-height', `${newH}px`);
+    }
+  }
+
+  function onPointerUp() {
+    if (!isDragging) return;
+    isDragging = false;
+    if (document.body && document.body.style) {
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    }
+    const currentHeight = actionDock.getBoundingClientRect ? actionDock.getBoundingClientRect().height : 250;
+    if (typeof localStorage !== 'undefined' && localStorage.setItem) {
+      localStorage.setItem('cyoa_dock_height', Math.round(currentHeight));
+    }
+  }
+
+  if (resizer.addEventListener) {
+    resizer.addEventListener('mousedown', onPointerDown);
+    resizer.addEventListener('touchstart', onPointerDown, { passive: true });
+  }
+
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('mouseup', onPointerUp);
+    window.addEventListener('touchmove', onPointerMove, { passive: true });
+    window.addEventListener('touchend', onPointerUp);
+  }
+
+  if (toggleCollapseBtn) {
+    toggleCollapseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isCollapsed = actionDock.classList.toggle('dock-collapsed');
+      toggleCollapseBtn.textContent = isCollapsed ? '▲' : '▼';
+      toggleCollapseBtn.title = isCollapsed ? 'Expand Choices Dock' : 'Collapse Choices Dock';
+    });
+  }
+}
+
+// Campaign Generation Modal Wizard
+function setupNewCampaignWizard() {
+  const newCampBtn = document.getElementById('new-campaign-btn');
+  const newCampModal = document.getElementById('new-campaign-modal');
+  const cancelBtn = document.getElementById('cancel-new-campaign-btn');
+  const closeBtn = document.getElementById('close-new-campaign-btn');
+  const form = document.getElementById('new-campaign-form');
+
+  if (!newCampBtn || !newCampModal || !form) return;
+
+  function openModal() {
+    newCampModal.classList.remove('hidden');
+  }
+  function closeModal() {
+    newCampModal.classList.add('hidden');
+  }
+
+  newCampBtn.addEventListener('click', openModal);
+  if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+  if (closeBtn) closeBtn.addEventListener('click', closeModal);
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const cidInput = document.getElementById('new-campaign-id');
+    const titleInput = document.getElementById('new-campaign-title');
+    const genreInput = document.getElementById('new-campaign-genre');
+    const modeInput = document.getElementById('new-campaign-mode');
+    const pacingInput = document.getElementById('new-campaign-pacing');
+    const purseInput = document.getElementById('new-campaign-purse');
+    const nameInput = document.getElementById('new-campaign-protagonist-name');
+    const roleInput = document.getElementById('new-campaign-protagonist-role');
+    const premiseInput = document.getElementById('new-campaign-premise');
+
+    const payload = {
+      campaign_id: cidInput ? cidInput.value.trim() : 'custom_campaign',
+      title: titleInput ? titleInput.value.trim() : '',
+      genre: genreInput ? genreInput.value.trim() : 'Adventure',
+      operational_mode: modeInput ? modeInput.value : 'classic_cyoa',
+      pacing_profile: pacingInput ? pacingInput.value : 'balanced',
+      purse: purseInput ? purseInput.value.trim() : '500 credits',
+      protagonist_name: nameInput ? nameInput.value.trim() : 'Protagonist',
+      protagonist_role: roleInput ? roleInput.value.trim() : 'Explorer',
+      premise: premiseInput ? premiseInput.value.trim() : 'At the threshold of a new journey.'
+    };
+
+    const submitBtn = document.getElementById('create-campaign-submit-btn');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Initializing...';
+    }
+
+    try {
+      const res = await fetch('http://localhost:8000/init_campaign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `HTTP error ${res.status}`);
+      }
+      const data = await res.json();
+      const newId = data.campaign_id;
+      showToast(`Campaign '${data.title || newId}' initialized successfully!`, 'success');
+      
+      campaignConfigs[newId] = data.config;
+      if (campaignSelect) {
+        let optExists = false;
+        for (let i = 0; i < campaignSelect.options.length; i++) {
+          if (campaignSelect.options[i].value === newId) {
+            optExists = true;
+            break;
+          }
+        }
+        if (!optExists) {
+          const opt = document.createElement('option');
+          opt.value = newId;
+          opt.textContent = (data.title || newId).toUpperCase();
+          campaignSelect.appendChild(opt);
+        }
+        campaignSelect.value = newId;
+        localStorage.setItem('cyoa_selected_campaign', newId);
+      }
+
+      applyActiveCampaignConfig();
+      if (dirHandle) {
+        await loadWorkspace(dirHandle);
+      } else {
+        renderInitialCampaignScene(newId);
+      }
+      closeModal();
+      form.reset();
+    } catch (err) {
+      showToast(`Initialization failed: ${err.message}`, 'error');
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '🚀 Initialize Campaign';
+      }
+    }
+  });
+}
+
+function setupStaticTabListeners() {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      const target = document.getElementById(btn.dataset.tab);
+      if (target) target.classList.add('active');
+      if (btn.dataset.tab === 'shadow-tab') {
+        updateShadowNarratorView();
+      }
+    });
+  });
+}
+
+// Initialize new UI components
+setupStaticTabListeners();
+setupDockResizer();
+setupNewCampaignWizard();
+setupShadowNarrator();

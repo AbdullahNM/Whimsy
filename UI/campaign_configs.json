@@ -138,6 +138,11 @@
           "type": "lore_browser"
         }
       ]
+    },
+    "retrieval": {
+      "enabled": true,
+      "max_passages": 5,
+      "char_budget": 16000
     }
   }
 }
