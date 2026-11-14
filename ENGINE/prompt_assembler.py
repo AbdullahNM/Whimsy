@@ -365,7 +365,8 @@ class PromptAssembler:
         campaign_name: str,
         active_topics: list[str] = None,
         query: str = None,
-        retrieval_enabled: bool = None
+        retrieval_enabled: bool = None,
+        calibration_advisory: str = None
     ) -> str:
         global_rules = self.load_global_rules()
         campaign_gameplay = self.load_campaign_gameplay(campaign_name)
@@ -443,10 +444,28 @@ class PromptAssembler:
         if world_foundation:
             foundation_section = f"# 3.1 WORLD FOUNDATION & EPISTEMIC BOUNDARIES\n{world_foundation}\n\n"
 
+        advisory_section = ""
+        if calibration_advisory is None:
+            try:
+                from ENGINE.calibration import get_calibration_advisory
+                adv = get_calibration_advisory(self.root_dir, campaign_name)
+                calibration_advisory = adv.advisory_prompt
+            except Exception:
+                try:
+                    from calibration import get_calibration_advisory
+                    adv = get_calibration_advisory(self.root_dir, campaign_name)
+                    calibration_advisory = adv.advisory_prompt
+                except Exception:
+                    calibration_advisory = ""
+
+        if calibration_advisory:
+            advisory_section = f"# 1.1 DYNAMIC AGENT CALIBRATION ADVISORY (SELF-CORRECTION DIRECTIVES)\n{calibration_advisory}\n\n"
+
         return (
             "You are the Game Master, Rules Arbiter, and World Simulator for a Choice-driven RPG engine.\n\n"
             "# 1. GLOBAL SYSTEM CONSTRAINTS (AUTHORITATIVE & IMMUTABLE)\n"
             f"{global_rules}\n\n"
+            f"{advisory_section}"
             "# 2. ACTIVE CAMPAIGN GAMEPLAY & STATE\n"
             f"{campaign_gameplay}\n\n"
             f"{directives_section}"
@@ -465,11 +484,13 @@ def assemble_prompt(
     campaign_name: str,
     root_dir: str = ".",
     query: str = None,
-    retrieval_enabled: bool = None
+    retrieval_enabled: bool = None,
+    calibration_advisory: str = None
 ) -> str:
     assembler = PromptAssembler(root_dir)
     return assembler.build_system_prompt(
         campaign_name,
         query=query,
-        retrieval_enabled=retrieval_enabled
+        retrieval_enabled=retrieval_enabled,
+        calibration_advisory=calibration_advisory
     )
