@@ -6,11 +6,20 @@ try:
 except ImportError:
     from turn_archiver import load_active_turns
 
+try:
+    from ENGINE.retrieval import HybridRetriever
+except ImportError:
+    try:
+        from retrieval import HybridRetriever
+    except ImportError:
+        HybridRetriever = None
+
 class PromptAssembler:
     def __init__(self, root_dir: str):
         self.root_dir = root_dir
         self.global_dir = os.path.join(root_dir, "GLOBAL")
         self.campaigns_dir = os.path.join(root_dir, "CAMPAIGNS")
+        self._retrievers = {}
 
     def load_global_rules(self) -> str:
         rule_files = sorted(glob.glob(os.path.join(self.global_dir, "CORE-*.md")))
@@ -48,6 +57,38 @@ class PromptAssembler:
             except Exception:
                 pass
         return ""
+
+    def get_campaign_retrieval_config(self, campaign_name: str) -> dict:
+        cfg_path = os.path.join(self.campaigns_dir, campaign_name, "campaign_config.json")
+        if not os.path.exists(cfg_path) and os.path.isdir(campaign_name):
+            cfg_path = os.path.join(campaign_name, "campaign_config.json")
+        if os.path.exists(cfg_path):
+            try:
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                    return cfg.get("retrieval", {})
+            except Exception:
+                pass
+        return {}
+
+    def get_retriever(self, campaign_name: str, retrieval_cfg: dict = None):
+        if HybridRetriever is None:
+            return None
+        if campaign_name not in self._retrievers:
+            campaign_dir = os.path.join(self.campaigns_dir, campaign_name)
+            if not os.path.exists(campaign_dir) and os.path.isdir(campaign_name):
+                campaign_dir = campaign_name
+            if not os.path.exists(campaign_dir):
+                return None
+            cfg = retrieval_cfg or self.get_campaign_retrieval_config(campaign_name)
+            char_budget = cfg.get("char_budget", 16000)
+            max_passages = cfg.get("max_passages", 5)
+            self._retrievers[campaign_name] = HybridRetriever(
+                campaign_dir=campaign_dir,
+                char_budget=char_budget,
+                max_passages=max_passages
+            )
+        return self._retrievers[campaign_name]
 
     def load_campaign_gameplay(self, campaign_name: str) -> str:
         gameplay_dir = os.path.join(self.campaigns_dir, campaign_name, "GAMEPLAY")
@@ -319,14 +360,63 @@ class PromptAssembler:
         except Exception as e:
             return f"=== WORLD FOUNDATION LOAD ERROR: {str(e)} ==="
 
-    def build_system_prompt(self, campaign_name: str, active_topics: list[str] = None) -> str:
+    def build_system_prompt(
+        self,
+        campaign_name: str,
+        active_topics: list[str] = None,
+        query: str = None,
+        retrieval_enabled: bool = None
+    ) -> str:
         global_rules = self.load_global_rules()
         campaign_gameplay = self.load_campaign_gameplay(campaign_name)
         campaign_directives = self.load_campaign_agents_directives(campaign_name)
         campaign_config = self.load_campaign_config(campaign_name)
         campaign_ontology = self.load_campaign_ontology(campaign_name)
         world_foundation = self.load_world_foundation(campaign_name)
-        world_lore = self.load_world_bible(campaign_name, active_topics)
+
+        # Determine retrieval mode
+        retrieval_cfg = self.get_campaign_retrieval_config(campaign_name)
+        should_use_retrieval = (
+            retrieval_enabled
+            if retrieval_enabled is not None
+            else retrieval_cfg.get("enabled", False)
+        )
+
+        world_lore = ""
+        if should_use_retrieval and HybridRetriever is not None:
+            retriever = self.get_retriever(campaign_name, retrieval_cfg)
+            if retriever:
+                search_query = query or ""
+                if not search_query and active_topics:
+                    search_query = " ".join(active_topics)
+                if not search_query:
+                    # Construct default query from active gameplay status coordinates
+                    status_path = os.path.join(self.campaigns_dir, campaign_name, "GAMEPLAY", "status.json")
+                    if not os.path.exists(status_path) and os.path.isdir(campaign_name):
+                        status_path = os.path.join(campaign_name, "GAMEPLAY", "status.json")
+                    if os.path.exists(status_path):
+                        try:
+                            with open(status_path, "r", encoding="utf-8") as f:
+                                sdata = json.load(f)
+                            loc = sdata.get("scene_anchor", {}).get("location", "")
+                            ctx = sdata.get("scene_anchor", {}).get("context", "")
+                            obj = sdata.get("pacing_state", {}).get("scene_objective", "")
+                            search_query = f"{loc} {ctx} {obj}".strip()
+                        except Exception:
+                            pass
+
+                char_budget = retrieval_cfg.get("char_budget", 16000)
+                max_passages = retrieval_cfg.get("max_passages", 5)
+                world_lore = retriever.retrieve_formatted(
+                    query=search_query,
+                    max_passages=max_passages,
+                    char_budget=char_budget,
+                    category_filter=active_topics
+                )
+
+        if not world_lore:
+            world_lore = self.load_world_bible(campaign_name, active_topics)
+
         narrative_ideas = self.load_campaign_ideas(campaign_name)
 
         # Load active turns
@@ -371,6 +461,15 @@ class PromptAssembler:
         )
 
 
-def assemble_prompt(campaign_name: str, root_dir: str = ".") -> str:
+def assemble_prompt(
+    campaign_name: str,
+    root_dir: str = ".",
+    query: str = None,
+    retrieval_enabled: bool = None
+) -> str:
     assembler = PromptAssembler(root_dir)
-    return assembler.build_system_prompt(campaign_name)
+    return assembler.build_system_prompt(
+        campaign_name,
+        query=query,
+        retrieval_enabled=retrieval_enabled
+    )
