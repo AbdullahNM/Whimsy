@@ -483,6 +483,45 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
                 "file_path": manager.md_path,
                 "messages": updated_messages
             }).encode("utf-8"))
+        elif self.path in ["/init_campaign", "/api/campaign/init", "/campaigns/create"]:
+            content_len = int(self.headers.get("Content-Length", 0))
+            raw_body = self.rfile.read(content_len)
+            try:
+                payload = json.loads(raw_body.decode("utf-8"))
+            except Exception as e:
+                self._set_cors_headers(400)
+                self.wfile.write(json.dumps({"error": f"Invalid JSON payload: {str(e)}"}).encode("utf-8"))
+                return
+
+            try:
+                from ENGINE.campaign_builder import scaffold_campaign
+                result = scaffold_campaign(ROOT_DIR, payload)
+                self._set_cors_headers(200)
+                self.wfile.write(json.dumps({"status": "created", **result}).encode("utf-8"))
+            except Exception as e:
+                self._set_cors_headers(500)
+                self.wfile.write(json.dumps({"error": f"Failed to scaffold campaign: {str(e)}"}).encode("utf-8"))
+
+        elif self.path in ["/shadow/consult", "/api/shadow/consult"]:
+            content_len = int(self.headers.get("Content-Length", 0))
+            raw_body = self.rfile.read(content_len)
+            try:
+                payload = json.loads(raw_body.decode("utf-8"))
+            except Exception as e:
+                self._set_cors_headers(400)
+                self.wfile.write(json.dumps({"error": f"Invalid JSON payload: {str(e)}"}).encode("utf-8"))
+                return
+
+            campaign = payload.get("campaign", payload.get("campaign_id", "template_campaign"))
+            query = payload.get("query", "")
+            try:
+                from ENGINE.campaign_builder import consult_shadow_narrator
+                result = consult_shadow_narrator(ROOT_DIR, campaign, query)
+                self._set_cors_headers(200)
+                self.wfile.write(json.dumps(result).encode("utf-8"))
+            except Exception as e:
+                self._set_cors_headers(500)
+                self.wfile.write(json.dumps({"error": f"Shadow consultation error: {str(e)}"}).encode("utf-8"))
         else:
             self._set_cors_headers(404)
             self.wfile.write(json.dumps({"error": "Unknown POST route"}).encode("utf-8"))

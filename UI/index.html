@@ -33,6 +33,7 @@
         <span class="metric-pill" id="metric-pill-purse">Purse: <strong id="val-purse">—</strong></span>
       </div>
       <div class="header-controls">
+        <button id="new-campaign-btn" class="action-btn secondary" title="Initialize a new campaign universe">✨ New Campaign</button>
         <button id="folder-picker-btn" class="action-btn">📂 Select Workspace</button>
         <button id="settings-btn" class="icon-btn" title="Settings / API Key">⚙</button>
       </div>
@@ -49,6 +50,7 @@
             <button class="tab-btn" data-tab="items-tab">Inventory</button>
             <button class="tab-btn" data-tab="ontology-tab">Lineages</button>
             <button class="tab-btn" data-tab="world-tab">World Bible</button>
+            <button class="tab-btn" data-tab="shadow-tab">Shadow GM</button>
           </div>
           <button id="expand-sidebar-btn" class="icon-btn-small" title="Expand / Shrink Sidebar">⤢</button>
         </div>
@@ -130,6 +132,40 @@
               <div id="lore-article-content" class="markdown-body">Select a category and article to view.</div>
             </div>
           </div>
+          <!-- Shadow Narrator Tab -->
+          <div id="shadow-tab" class="tab-pane">
+            <div class="shadow-narrator-panel">
+              <div class="shadow-header">
+                <div class="shadow-title">🔮 Shadow Narrator</div>
+                <div class="shadow-subtitle">Continuity Guardian & Narrative Compass</div>
+              </div>
+              <div class="shadow-pacing-card">
+                <div class="shadow-section-label">Active Pacing & Intensity</div>
+                <div class="shadow-badges-row">
+                  <span class="shadow-badge">Mode: <strong id="shadow-val-mode">Classic CYOA</strong></span>
+                  <span class="shadow-badge">Focus: <strong id="shadow-val-zoom">Detailed</strong></span>
+                  <span class="shadow-badge">Intensity: <strong id="shadow-val-intensity">1/5</strong></span>
+                  <span class="shadow-badge">Clock: <strong id="shadow-val-clock">Day 1, 08:00</strong></span>
+                </div>
+              </div>
+              <div class="shadow-section">
+                <div class="shadow-section-label">Narrative Steering & Objectives</div>
+                <div id="shadow-steering-render" class="markdown-body">
+                  <div class="empty-hint">Loading campaign narrative steering...</div>
+                </div>
+              </div>
+              <div class="shadow-consult-box">
+                <div class="shadow-section-label">Consult Shadow Narrator</div>
+                <p class="shadow-hint">Request pacing calibration, check unaddressed plot threads, or inject continuity constraints:</p>
+                <div class="shadow-input-row">
+                  <input type="text" id="shadow-query-input" placeholder="e.g. Advise on pacing for the upcoming faction trial..." />
+                  <button id="shadow-consult-btn" class="action-btn primary">Consult</button>
+                </div>
+                <div id="shadow-consult-result" class="shadow-result-box hidden"></div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </aside>
 
@@ -144,6 +180,15 @@
             <p>The template provides a complete, genre-agnostic scaffold: gameplay state, a modular world bible, and a rolling turn log.</p>
             <p>Use the 📂 Select Workspace button to load an existing campaign folder.</p>
           </div>
+        </div>
+
+        <!-- Resizable Dock Splitter Bar -->
+        <div id="dock-resizer" class="dock-resizer" title="Drag up/down to resize choices panel">
+          <div class="resizer-handle">
+            <span class="resizer-grip">•••</span>
+            <span class="resizer-label">Choices & Actions</span>
+          </div>
+          <button id="toggle-dock-collapse-btn" class="icon-btn-micro" title="Collapse / Expand Choices">▼</button>
         </div>
 
         <!-- Fixed Bottom Action Dock -->
@@ -190,6 +235,81 @@
           </div>
         </footer>
       </main>
+    </div>
+
+    
+    <!-- New Campaign Wizard Modal -->
+    <div id="new-campaign-modal" class="modal-overlay hidden">
+      <div class="modal-content new-campaign-modal-content">
+        <div class="modal-header">
+          <h3>✨ Initialize New Campaign Universe</h3>
+          <button id="close-new-campaign-modal-btn" class="icon-btn" title="Close">✕</button>
+        </div>
+        <form id="new-campaign-form">
+          <div class="form-row">
+            <label>
+              Campaign ID (slug):
+              <input type="text" id="new-campaign-id" placeholder="e.g. cyber_heist" required pattern="[a-z0-9_-]+" title="Lowercase letters, numbers, underscores or hyphens only" />
+            </label>
+            <label>
+              Campaign Title:
+              <input type="text" id="new-campaign-title" placeholder="e.g. The Neon Syndicate" required />
+            </label>
+          </div>
+          <div class="form-row">
+            <label>
+              Genre & Universe:
+              <select id="new-campaign-genre">
+                <option value="High Academic Fantasy / Cultivation">High Academic Fantasy / Cultivation</option>
+                <option value="Cyber-Spiritual Sci-Fi">Cyber-Spiritual Sci-Fi</option>
+                <option value="Cosmic Mythology / Pantheon Sim">Cosmic Mythology / Pantheon Sim</option>
+                <option value="1940s Noir Mystery & Espionage">1940s Noir Mystery & Espionage</option>
+                <option value="Post-Apocalyptic Survival">Post-Apocalyptic Survival</option>
+                <option value="Custom Universe">Custom Universe</option>
+              </select>
+            </label>
+            <label>
+              Operational Mode:
+              <select id="new-campaign-mode">
+                <option value="classic_cyoa" selected>Classic CYOA (Strict numbered choices, deterministic receipts)</option>
+                <option value="freeform_simulation">Freeform Simulation (Compound actions, emergent narrative)</option>
+              </select>
+            </label>
+          </div>
+          <div class="form-row">
+            <label>
+              Pacing Profile:
+              <select id="new-campaign-pacing">
+                <option value="slow">Slow (Deep conversational beats, patient discovery)</option>
+                <option value="balanced" selected>Balanced (Scene focus on pivotal moments, routine compressed)</option>
+                <option value="fast">Fast (Accelerated milestones, cinematic macro jumps)</option>
+              </select>
+            </label>
+            <label>
+              Starting In-Game Currency / Purse:
+              <input type="text" id="new-campaign-purse" value="500 credits" />
+            </label>
+          </div>
+          <div class="form-row">
+            <label>
+              Protagonist Name:
+              <input type="text" id="new-campaign-protagonist-name" placeholder="e.g. Caelan Veyr" required />
+            </label>
+            <label>
+              Protagonist Archetype / Role:
+              <input type="text" id="new-campaign-protagonist-role" placeholder="e.g. First-Year Specialist" required />
+            </label>
+          </div>
+          <label>
+            Starting Scene Anchor & Premise:
+            <textarea id="new-campaign-premise" rows="3" placeholder="Describe the starting location, circumstances, and immediate situation..."></textarea>
+          </label>
+          <div class="modal-actions">
+            <button type="submit" id="create-campaign-submit-btn" class="action-btn primary">🚀 Initialize Campaign</button>
+            <button type="button" id="cancel-new-campaign-btn" class="action-btn">Cancel</button>
+          </div>
+        </form>
+      </div>
     </div>
 
     <!-- Settings Modal -->
