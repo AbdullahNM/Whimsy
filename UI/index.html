@@ -21,7 +21,7 @@
         <select id="campaign-select" class="campaign-dropdown">
           <option value="template_campaign" selected>TEMPLATE CAMPAIGN</option>
         </select>
-        <span id="sync-status" class="status-pill status-disconnected">No Folder Selected</span>
+        <span id="sync-status" class="status-pill status-indexeddb" title="IndexedDB Offline Storage Active">💾 IndexedDB Active</span>
         <span id="hud-mode-badge" class="hud-badge mode-badge mode-classic" title="Operational Mode">Classic CYOA</span>
         <span id="hud-focus-pill" class="hud-pill focus-pill" title="Narrative Camera Focus / Zoom">Detailed Scene</span>
         <span id="hud-clock-pill" class="hud-pill clock-pill" title="In-Game Time / Simulation Clock">?? <strong id="val-clock">Day 1, 08:00</strong></span>
@@ -316,6 +316,14 @@
     <div id="settings-modal" class="modal-overlay hidden">
       <div class="modal-content">
         <h3>Campaign & Model Settings</h3>
+        <label>
+          Narration Engine Tier:
+          <select id="narration-tier-select">
+            <option value="1" selected>Tier 1: Authored / Offline (Zero network, 100% keyless, instant)</option>
+            <option value="2">Tier 2: Local Model (In-browser WebGPU/WASM or local endpoint)</option>
+            <option value="3">Tier 3: Cloud LLM (BYO API key via OpenRouter or Gemini)</option>
+          </select>
+        </label>
         <label id="gemini-key-label">
           API Key <small style="color:var(--gold-dim)">(OpenRouter sk-or-... or Gemini AIzaSy...)</small>:
           <input type="password" id="gemini-api-key" placeholder="sk-or-v1-... or AIzaSy... (optional for local)" />
@@ -347,6 +355,11 @@
             <input type="text" id="local-endpoint-url" placeholder="http://localhost:8000/generate" value="http://localhost:8000/generate" />
           </label>
         </div>
+        <div class="save-management-row" style="margin-top: 12px; margin-bottom: 8px; display: flex; gap: 8px;">
+          <button id="export-save-btn" type="button" class="action-btn" title="Export campaign save file as JSON">💾 Export Save JSON</button>
+          <button id="import-save-btn" type="button" class="action-btn" title="Import campaign save file">📥 Import Save JSON</button>
+          <input type="file" id="import-save-file" accept=".json" style="display: none;" />
+        </div>
         <div class="modal-actions">
           <button id="save-settings-btn" class="action-btn primary">Save & Close</button>
           <button id="close-settings-btn" class="action-btn">Cancel</button>
@@ -355,6 +368,12 @@
     </div>
   </div>
 
+  <script src="core/deterministic_core.js"></script>
+  <script src="storage/indexeddb.js"></script>
+  <script src="narrator/authored_narrator.js"></script>
+  <script src="narrator/local_narrator.js"></script>
+  <script src="narrator/cloud_narrator.js"></script>
+  <script src="narrator/tiered_narrator.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

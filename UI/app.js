@@ -345,7 +345,7 @@ async function loadInitialData() {
     }
 
     applyActiveCampaignConfig();
-    loadManifestDataIntoUI();
+    await loadCampaignFromStorageOrManifest(targetVal);
 
     // Check for existing stored folder handle
     const storedHandle = await getStoredHandle();
@@ -374,6 +374,10 @@ async function loadInitialData() {
         syncStatus.title = 'Click to re-authorize workspace folder access';
       }
       }
+    } else {
+      syncStatus.textContent = '💾 IndexedDB Active';
+      syncStatus.className = 'status-pill status-indexeddb';
+      syncStatus.title = 'IndexedDB Offline Storage Active (Zero Backend Required)';
     }
   } catch (e) {
     console.error('Failed to load initial configs/manifest:', e);
@@ -472,6 +476,81 @@ function loadManifestDataIntoUI() {
   } else {
     renderInitialCampaignScene(selectedId);
   }
+}
+
+
+// Load campaign either from IndexedDB persistent store or bundled gameplay manifest (R3)
+async function loadCampaignFromStorageOrManifest(campaignId) {
+  const selectedId = campaignId || (campaignSelect ? campaignSelect.value : 'template_campaign');
+  let savedCampaign = null;
+  let savedTurns = [];
+
+  try {
+    if (window.WhimsyStorage) {
+      savedCampaign = await window.WhimsyStorage.getCampaignState(selectedId);
+      savedTurns = await window.WhimsyStorage.getTurns(selectedId);
+    }
+  } catch (e) {
+    console.warn('Could not read campaign state from IndexedDB:', e);
+  }
+
+  if (savedCampaign && savedCampaign.state) {
+    const manifestEntry = (gameplayManifest && gameplayManifest[selectedId]) || {};
+    campaignData.statusJson = savedCampaign.state;
+    campaignData.status = savedCampaign.statusMd || manifestEntry.status || '';
+    campaignData.relations = manifestEntry.relations || '';
+    campaignData.items = manifestEntry.items || '';
+    campaignData.relationsJson = manifestEntry.relations_json || null;
+    campaignData.itemsJson = manifestEntry.items_json || null;
+    campaignData.ontologyJson = manifestEntry.ontology_json || null;
+    campaignData.upcomingHooks = manifestEntry.upcoming_hooks || '';
+    campaignData.narrativeSteering = manifestEntry.narrative_steering || '';
+
+    if (savedTurns && savedTurns.length > 0) {
+      campaignData.activeTurns = savedTurns.map(t => ({
+        name: t.name || `turn_${String(t.turnNumber).padStart(4, '0')}.md`,
+        content: t.content
+      }));
+      currentTurn = savedCampaign.currentTurn || (savedTurns[savedTurns.length - 1].turnNumber + 1);
+    } else {
+      campaignData.activeTurns = [];
+      currentTurn = savedCampaign.currentTurn || savedCampaign.state.turn || 1;
+    }
+
+    renderSchemaDrivenStatus(campaignData.statusJson, activeConfig, campaignData.status);
+    renderRelations(campaignData.relationsJson, campaignData.relations);
+    renderItems(campaignData.itemsJson, campaignData.items);
+    if (campaignData.ontologyJson) renderOntology(campaignData.ontologyJson);
+    renderIdeas(campaignData.narrativeSteering, campaignData.upcomingHooks);
+    extractMetrics(campaignData.status, campaignData.items, campaignData.statusJson);
+
+    const turnEl = document.getElementById('val-turn');
+    if (turnEl) turnEl.textContent = currentTurn;
+
+    if (campaignData.activeTurns.length > 0) {
+      currentTurnViewIndex = campaignData.activeTurns.length - 1;
+      renderCurrentTurnView(campaignData.activeTurns);
+    } else {
+      renderInitialCampaignScene(selectedId);
+    }
+    return;
+  }
+
+  loadManifestDataIntoUI();
+}
+
+function renderOfferedChoices(offeredChoices) {
+  if (!offeredChoices || offeredChoices.length === 0) return;
+  choiceGrid.innerHTML = '';
+  selectedChoice = null;
+  offeredChoices.forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.dataset.choice = c.index;
+    btn.innerHTML = `<span class="choice-num">${c.index}.</span> <span class="choice-desc">${escapeHtml(c.text)}</span>`;
+    choiceGrid.appendChild(btn);
+  });
+  setupChoiceButtonListeners();
 }
 
 loadInitialData();
@@ -1193,15 +1272,70 @@ saveSettingsBtn.addEventListener('click', () => {
   if (maxTurnsInput) {
     localStorage.setItem('cyoa_max_turns', maxTurnsInput.value);
   }
+  const tierElem = document.getElementById('narration-tier-select');
+  if (tierElem) {
+    localStorage.setItem('cyoa_narration_tier', tierElem.value);
+  }
   settingsModal.classList.add('hidden');
 });
 
+// Load stored narration tier
+const narrationTierSelect = document.getElementById('narration-tier-select');
+if (narrationTierSelect) {
+  const storedTier = localStorage.getItem('cyoa_narration_tier');
+  if (storedTier) narrationTierSelect.value = storedTier;
+}
+
+// Save Management: Export Save JSON
+const exportSaveBtn = document.getElementById('export-save-btn');
+if (exportSaveBtn) {
+  exportSaveBtn.addEventListener('click', async () => {
+    try {
+      const cid = campaignSelect ? campaignSelect.value : 'template_campaign';
+      const saveData = await window.WhimsyStorage.exportSave(cid);
+      const blob = new Blob([JSON.stringify(saveData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `whimsy_save_${cid}_turn_${currentTurn}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('Campaign save exported successfully!', 'success');
+    } catch (e) {
+      showToast(`Export error: ${e.message}`, 'error');
+    }
+  });
+}
+
+// Save Management: Import Save JSON
+const importSaveBtn = document.getElementById('import-save-btn');
+const importSaveFile = document.getElementById('import-save-file');
+if (importSaveBtn && importSaveFile) {
+  importSaveBtn.addEventListener('click', () => importSaveFile.click());
+  importSaveFile.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      await window.WhimsyStorage.importSave(data);
+      showToast(`Imported save for ${data.campaignId || 'campaign'}!`, 'success');
+      await loadCampaignFromStorageOrManifest(data.campaignId);
+      if (campaignSelect && data.campaignId) campaignSelect.value = data.campaignId;
+      settingsModal.classList.add('hidden');
+    } catch (err) {
+      showToast(`Import error: ${err.message}`, 'error');
+    }
+  });
+}
+
+
 // Campaign Switching
 if (campaignSelect) {
-  campaignSelect.addEventListener('change', () => {
+  campaignSelect.addEventListener('change', async () => {
     localStorage.setItem('cyoa_selected_campaign', campaignSelect.value);
     applyActiveCampaignConfig();
-    loadManifestDataIntoUI();
+    await loadCampaignFromStorageOrManifest(campaignSelect.value);
     if (dirHandle) {
       loadWorkspace(dirHandle);
     }
@@ -1358,18 +1492,63 @@ async function executeTurnAction(choiceNum, choiceText) {
   // Show thinking indicator
   const loadingBody = appendCard(`Turn ${resolvingTurn} • Game Master`, '<p><em>Simulating world response and calculating matrix causalities...</em></p>');
 
-  const selectedModel = modelSelect ? modelSelect.value : (localStorage.getItem('cyoa_model') || 'local-antigravity');
-  const isLocal = selectedModel === 'local-antigravity' || selectedModel === 'local-endpoint';
-  const apiKey = localStorage.getItem('gemini_api_key');
-
-  if (!isLocal && !apiKey) {
-    loadingBody.innerHTML = `<p style="color: var(--accent-crimson)"><strong>Error:</strong> No Gemini API Key configured for cloud model. Click ⚙ in the top bar to set your key, or select <strong>Local Antigravity</strong>.</p>`;
-    return;
-  }
+  const selectedCampaign = campaignSelect ? campaignSelect.value : 'template_campaign';
+  const tierSelect = document.getElementById('narration-tier-select');
+  const preferredTier = tierSelect ? parseInt(tierSelect.value, 10) : (parseInt(localStorage.getItem('cyoa_narration_tier'), 10) || 1);
 
   try {
     const pacing = localStorage.getItem('cyoa_pacing') || 'standard';
-    const response = await callGeminiAPI(apiKey, playerAction, pacing);
+    const apiKey = localStorage.getItem('gemini_api_key');
+    const selectedModel = modelSelect ? modelSelect.value : (localStorage.getItem('cyoa_model') || 'gemini-2.5-flash');
+    const localEndpoint = (localEndpointInput && localEndpointInput.value.trim()) || localStorage.getItem('cyoa_local_endpoint') || 'http://localhost:8000/generate';
+
+    const activeCfg = campaignConfigs[selectedCampaign] || activeConfig || {};
+    const stateInput = campaignData.statusJson || (gameplayManifest[selectedCampaign] && gameplayManifest[selectedCampaign].status_json) || { turn: resolvingTurn };
+
+    const actionInput = (choiceNum !== undefined && choiceNum !== null && String(choiceNum).trim() !== '')
+      ? String(choiceNum).trim()
+      : playerAction;
+
+    const coreConfig = {
+      ...activeCfg,
+      seed: (activeCfg.seed !== undefined ? activeCfg.seed : 42) + resolvingTurn,
+      operational_mode: activeCfg.operational_mode || 'classic_cyoa'
+    };
+
+    const narratorContext = {
+      sceneAnchor: stateInput.scene_anchor,
+      character: stateInput.character,
+      activeConfig: activeCfg,
+      upcomingHooks: campaignData.upcomingHooks,
+      genre: activeCfg.genre
+    };
+
+    let outcome, narration;
+    if (window.tieredNarrator) {
+      const res = await window.tieredNarrator.resolveTurn({
+        state: stateInput,
+        action: actionInput,
+        config: coreConfig,
+        preferredTier: preferredTier,
+        context: narratorContext,
+        apiKey: apiKey,
+        model: selectedModel,
+        pacing: pacing,
+        localEndpoint: localEndpoint
+      });
+      outcome = res.outcome;
+      narration = res.narration;
+    } else if (window.DeterministicCore && window.DeterministicCore.Core) {
+      outcome = window.DeterministicCore.Core.resolve(stateInput, actionInput, coreConfig);
+      narration = {
+        text: `You proceed with: ${playerAction}\n\n[OPTIONS]\n` + (outcome.offered_choices || []).map(c => `${c.index}. ${c.text}`).join('\n'),
+        tierUsed: 1
+      };
+    } else {
+      throw new Error('DeterministicCore is required for turn resolution.');
+    }
+
+    const response = narration.text;
 
     // Format full turn file content with standard Turn / Player Action / GM Response headers
     const turnFileName = `turn_${String(resolvingTurn).padStart(4, '0')}.md`;
@@ -1380,30 +1559,60 @@ async function executeTurnAction(choiceNum, choiceText) {
     currentTurnViewIndex = campaignData.activeTurns.length - 1;
     renderCurrentTurnView(campaignData.activeTurns);
 
-    // Parse and persist state deltas (XP, coin, strain) to disk & memory
-    await updateAndPersistState(response);
-
-    // Save turn file to disk if workspace is connected
-    if (dirHandle) {
-      await saveTurnToDisk(resolvingTurn, playerAction, response);
+    // Apply deterministic outcome state
+    if (outcome && outcome.next_state) {
+      campaignData.statusJson = outcome.next_state;
     }
 
-    // Now advance currentTurn to the next pending turn
-    currentTurn = resolvingTurn + 1;
+    // Advance turn counter
+    currentTurn = (outcome?.next_state?.turn) || (resolvingTurn + 1);
     const turnEl = document.getElementById('val-turn');
     if (turnEl) turnEl.textContent = currentTurn;
 
-    // Update status.json and status.md with currentTurn
-    if (campaignData.statusJson) {
-      campaignData.statusJson.turn = currentTurn;
-    }
     if (campaignData.status) {
       campaignData.status = campaignData.status.replace(/Turn\*?:\s*\*?\d+\*?/i, `Turn**: **${currentTurn}**`);
     }
 
-    parseAndRenderNewChoices(response);
+    // Refresh UI with deterministic state
+    renderSchemaDrivenStatus(campaignData.statusJson, activeConfig, campaignData.status);
+    extractMetrics(campaignData.status, campaignData.items, campaignData.statusJson);
+
+    // Persist to IndexedDB (R3)
+    if (window.WhimsyStorage) {
+      await window.WhimsyStorage.saveTurn(selectedCampaign, resolvingTurn, {
+        name: turnFileName,
+        content: fullTurnContent,
+        playerAction,
+        gmResponse: response,
+        outcome: outcome.toDict ? outcome.toDict() : outcome
+      });
+      await window.WhimsyStorage.saveCampaignState(selectedCampaign, {
+        state: campaignData.statusJson,
+        currentTurn: currentTurn,
+        statusMd: campaignData.status
+      });
+      await window.WhimsyStorage.recordReplayStep(selectedCampaign, {
+        turnNumber: resolvingTurn,
+        action: actionInput,
+        outcome: outcome.toDict ? outcome.toDict() : outcome,
+        initialState: campaignData.initialState || stateInput
+      });
+    }
+
+    // Dual persistence to disk if workspace handle is connected
+    if (dirHandle) {
+      await updateAndPersistState(response);
+      await saveTurnToDisk(resolvingTurn, playerAction, response);
+    }
+
+    // Offer new choices from deterministic outcome or response
+    if (outcome && outcome.offered_choices && outcome.offered_choices.length > 0) {
+      renderOfferedChoices(outcome.offered_choices);
+    } else {
+      parseAndRenderNewChoices(response);
+    }
   } catch (err) {
-    loadingBody.innerHTML = `<p style="color: var(--accent-crimson)"><strong>Generation Error:</strong> ${escapeHtml(err.message)}</p>`;
+    loadingBody.innerHTML = `<p style="color: var(--accent-crimson)"><strong>Resolution Error:</strong> ${escapeHtml(err.message)}</p>`;
   }
 }
 

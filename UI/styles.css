@@ -98,6 +98,12 @@ body {
   color: var(--accent-crimson);
 }
 
+.status-indexeddb {
+  background-color: #1a2a3a;
+  color: #63b3ed;
+  border: 1px solid #2b4c7e;
+}
+
 .status-reconnect {
   background-color: #3d2e14;
   color: #f6ad55;
@@ -1253,6 +1259,50 @@ body {
 
   .clean-stat-list {
     grid-template-columns: 1fr;
+  }
+
+  /* Mobile Touch Targets (WCAG 2.1 - Min 44x44px) */
+  .action-btn,
+  .choice-btn,
+  .tab-btn,
+  .icon-btn,
+  #toggle-sidebar-btn,
+  #submit-action-btn {
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+
+  .icon-btn,
+  #toggle-sidebar-btn {
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .tab-btn {
+    padding: 12px 14px;
+  }
+}
+
+/* Landscape Mobile Optimization */
+@media (orientation: landscape) and (max-height: 550px) {
+  #top-bar {
+    padding: 4px 8px;
+  }
+  .choices-dock {
+    max-height: 38vh;
+  }
+  .choice-grid {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    max-height: 26vh;
+  }
+  #story-stream {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+  .scene-card {
+    padding: 10px 12px;
   }
 }
 
