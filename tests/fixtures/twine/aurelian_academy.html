@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Aurelian Academy</title>
+</head>
+<body>
+<tw-storydata name="Aurelian Academy" startnode="1" creator="Whimsy" creator-version="1.0.0" format="Harlowe" format-version="3.3.9" ifid="A1B2C3D4-E5F6-7890-ABCD-EF1234567890" zoom="1" options="" hidden>
+<style role="stylesheet" id="twine-user-stylesheet" type="text/twine-css"></style>
+<script role="script" id="twine-user-script" type="text/twine-javascript"></script>
+<tw-passagedata pid="1" name="Academy Gates" tags="location:gates mode:classic_cyoa intensity:1 faction:scholars" position="100,150" size="100,100">The wrought-iron gates of Aurelian Academy swing open into the grand courtyard. The bell tower tolls the ninth hour.
+
+<<set $scholarly_prestige = 10>>
+(set: $energy to 100)
+
+[[Cross the cobblestone courtyard to the Library->Grand Library]]
+[[Head toward the Alchemy Wing->Alchemy Lab]]
+[[Report directly to the Dean's Study->Dean Study]]</tw-passagedata>
+<tw-passagedata pid="2" name="Grand Library" tags="location:library intensity:2 faction:archivists" position="350,50" size="100,100">Towering bookshelves rise three storeys high. The head archivist gestures toward the restricted section.
+
+<<set $has_library_access = true>>
+
+[[Consult the forbidden grimoire->Secret Archives]]
+[[Return to the Central Courtyard->Central Courtyard]]</tw-passagedata>
+<tw-passagedata pid="3" name="Alchemy Lab" tags="location:alchemy_lab intensity:2 faction:alchemists" position="350,150" size="100,100">Glass retorts bubble with iridescent luminescent liquids. Senior Alchemist Vane inspects your distillation technique.
+
+(set: $alchemical_affinity to 25)
+
+[[Brew the elixir of clarity->Clocktower]]
+[[Return to the Central Courtyard->Central Courtyard]]</tw-passagedata>
+<tw-passagedata pid="4" name="Dean Study" tags="location:dean_study intensity:3 faction:administration" position="350,250" size="100,100">Dean Aurelius peers over his brass spectacles from behind an obsidian desk.
+
+[[Accept the Dean's secret commission->Trial Chamber]]
+[[Request reassignment to the commons->Sunlit Commons]]</tw-passagedata>
+<tw-passagedata pid="5" name="Central Courtyard" tags="location:courtyard intensity:1" position="350,350" size="100,100">Students gather beneath the shade of the ancient golden oak in the center of the campus.
+
+[[Head to the Clocktower->Clocktower]]
+[[Stroll to the Sunlit Commons->Sunlit Commons]]</tw-passagedata>
+<tw-passagedata pid="6" name="Secret Archives" tags="location:archives intensity:4 clock:curfew" position="600,50" size="100,100">Subterranean vaults smell of aged parchment and ozone. An enchanted ward seals the vault door.
+
+<<set $vault_unlocked = true>>
+
+[[Dispel the ward and enter the inner vault->Forbidden Vault]]
+[[Retreat before the night watch arrives->Clocktower]]</tw-passagedata>
+<tw-passagedata pid="7" name="Clocktower" tags="location:clocktower intensity:2" position="600,150" size="100,100">The massive copper gears of the astronomical clock tick in rhythmic cadence. You look out across the whole academy.
+
+[[Descend to the Trial Chamber->Trial Chamber]]
+[[Take the aerial bridge to the Commons->Sunlit Commons]]</tw-passagedata>
+<tw-passagedata pid="8" name="Sunlit Commons" tags="location:commons intensity:1" position="600,250" size="100,100">Laughter and debate echo across the dining benches. A courier delivers an urgent summons.
+
+[[Answer the summons at the Trial Chamber->Trial Chamber]]</tw-passagedata>
+<tw-passagedata pid="9" name="Forbidden Vault" tags="location:vault intensity:5 faction:ancients" position="850,50" size="100,100">Within the sealed chamber rests the Aurelian Cornerstone, glowing with primordial power.
+
+[[Absorb the cornerstone power->Valedictorian Ending]]
+[[Deliver the cornerstone to the Faculty Council->Valedictorian Ending]]</tw-passagedata>
+<tw-passagedata pid="10" name="Trial Chamber" tags="location:trial_chamber intensity:4 faction:tribunal" position="850,150" size="100,100">The High Tribunal convenes to judge your thesis and actions throughout the term.
+
+[[Present your scholarly dissertation->Valedictorian Ending]]
+[[Defy the tribunal's conservative edict->Exiled Ending]]</tw-passagedata>
+<tw-passagedata pid="11" name="Valedictorian Ending" tags="terminal location:grand_hall faction:scholars" position="1100,100" size="100,100">You graduate at the summit of Aurelian Academy with highest honors and prestige.</tw-passagedata>
+<tw-passagedata pid="12" name="Exiled Ending" tags="terminal location:outer_rim" position="1100,200" size="100,100">Cast out from the academy gates, you depart into the wide world to forge your own path.</tw-passagedata>
+</tw-storydata>
+</body>
+</html>

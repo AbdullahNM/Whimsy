@@ -98,6 +98,8 @@ class TestSchemas(unittest.TestCase):
             cls.world_foundation_schema = json.load(f)
         with open(os.path.join(cls.schemas_dir, "outcome.schema.json"), "r") as f:
             cls.outcome_schema = json.load(f)
+        with open(os.path.join(cls.schemas_dir, "story_graph.schema.json"), "r") as f:
+            cls.story_graph_schema = json.load(f)
 
     def _load_json(self, rel_path: str) -> dict:
         full_path = os.path.join(ROOT_DIR, rel_path)
@@ -128,6 +130,7 @@ class TestSchemas(unittest.TestCase):
         errors = SimpleSchemaValidator.validate(wf, self.world_foundation_schema)
         self.assertEqual(errors, [], f"Template world_foundation schema errors: {errors}")
         self.assertEqual(wf["campaign_id"], "template_campaign")
+
     def test_pacing_state_schema_valid(self):
         status = self._load_json("CAMPAIGNS/template_campaign/GAMEPLAY/status.json")
         self.assertIn("pacing_state", status)
@@ -191,6 +194,7 @@ class TestSchemas(unittest.TestCase):
         errors = SimpleSchemaValidator.validate(bad_wf, self.world_foundation_schema)
         self.assertTrue(any("missing required property 'immutable_facts'" in e for e in errors))
         self.assertTrue(any("missing required property 'npc_knowledge'" in e for e in errors))
+
     def test_negative_invalid_pacing_zoom_level(self):
         bad_status = {
             "schema_version": 2,
@@ -267,6 +271,55 @@ class TestSchemas(unittest.TestCase):
             "events": []
         }
         errors = SimpleSchemaValidator.validate(invalid_outcome, self.outcome_schema)
+        self.assertTrue(any("missing required property" in e for e in errors))
+
+    # --- Story Graph Schema Tests ---
+
+    def test_story_graph_schema_valid(self):
+        valid_graph = {
+            "schema_version": 1,
+            "name": "Test Story",
+            "startnode": "1",
+            "metadata": {
+                "creator": "Whimsy",
+                "format": "Harlowe"
+            },
+            "passages": [
+                {
+                    "pid": 1,
+                    "name": "Start",
+                    "text": "Welcome to the story. [[Go forward->Next]]",
+                    "tags": ["location:hall", "mode:classic_cyoa"],
+                    "links": [
+                        {"text": "Go forward", "target": "Next"}
+                    ],
+                    "variables": {"energy": 100},
+                    "metadata": {"location": "hall"},
+                    "position": {"x": 100, "y": 100},
+                    "size": {"width": 100, "height": 100}
+                },
+                {
+                    "pid": 2,
+                    "name": "Next",
+                    "text": "The end.",
+                    "tags": ["terminal"],
+                    "links": [],
+                    "variables": {},
+                    "metadata": {"terminal": True},
+                    "position": {"x": 300, "y": 100},
+                    "size": {"width": 100, "height": 100}
+                }
+            ]
+        }
+        errors = SimpleSchemaValidator.validate(valid_graph, self.story_graph_schema)
+        self.assertEqual(errors, [], f"Expected story_graph to be valid, got: {errors}")
+
+    def test_story_graph_schema_missing_required_fails(self):
+        invalid_graph = {
+            "schema_version": 1,
+            "name": "Test Story"
+        }
+        errors = SimpleSchemaValidator.validate(invalid_graph, self.story_graph_schema)
         self.assertTrue(any("missing required property" in e for e in errors))
 
 

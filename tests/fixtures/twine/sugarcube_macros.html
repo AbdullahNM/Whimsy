@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SugarCube Macros Test</title>
+</head>
+<body>
+<tw-storydata name="SugarCube Macros Test" startnode="1" creator="Whimsy" creator-version="1.0.0" format="SugarCube" format-version="2.36.1" ifid="C2D3E4F5-A6B7-8901-CDEF-234567890123" zoom="1" options="" hidden>
+<style role="stylesheet" id="twine-user-stylesheet" type="text/twine-css"></style>
+<script role="script" id="twine-user-script" type="text/twine-javascript"></script>
+<tw-passagedata pid="1" name="Starting Office" tags="location:office mode:classic_cyoa intensity:1" position="100,100" size="100,100">Welcome, <<print $player_name>>.
+<<if $security_clearance > 1>>Clearance verified.<</if>>
+
+<<set $credits = 250>>
+<<set $intel_points = 5>>
+
+<<link "Inspect the secure terminal" "Secure Terminal">>
+<<link "Browse filing cabinet" [[Filing Cabinet]]>>
+</tw-passagedata>
+<tw-passagedata pid="2" name="Secure Terminal" tags="location:terminal" position="350,50" size="100,100">The green terminal glows.
+<<widget "decrypt">>Decryption utility active.<</widget>>
+
+<<set $has_terminal_access = true>>
+
+<<link "Transmit the gathered dossier" "Final Submission">>
+</tw-passagedata>
+<tw-passagedata pid="3" name="Filing Cabinet" tags="location:archive" position="350,150" size="100,100">You locate an encrypted microfiche inside the bottom drawer.
+
+<<link "Take the microfiche to the terminal" "Secure Terminal">>
+<<link "Proceed to the final submission point" "Final Submission">>
+</tw-passagedata>
+<tw-passagedata pid="4" name="Final Submission" tags="terminal location:headquarters" position="600,100" size="100,100">Mission accomplished. Dossier submitted successfully.</tw-passagedata>
+</tw-storydata>
+</body>
+</html>
