@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "StoryGraphSchema",
+  "description": "Serialized Twine-compatible story graph format representing narrative scene nodes, offered choices, metadata tags, and state mutations.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "name",
+    "startnode",
+    "passages"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Story graph schema version number."
+    },
+    "name": {
+      "type": "string",
+      "description": "Story or campaign title."
+    },
+    "startnode": {
+      "type": "string",
+      "description": "PID or name of the starting passage."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Archive-level metadata (creator, format, ifid, zoom, etc.).",
+      "properties": {
+        "creator": {
+          "type": "string"
+        },
+        "creator_version": {
+          "type": "string"
+        },
+        "format": {
+          "type": "string"
+        },
+        "format_version": {
+          "type": "string"
+        },
+        "ifid": {
+          "type": "string"
+        },
+        "zoom": {
+          "type": "string"
+        },
+        "options": {
+          "type": "string"
+        }
+      }
+    },
+    "passages": {
+      "type": "array",
+      "description": "List of passage nodes forming the story graph.",
+      "items": {
+        "type": "object",
+        "required": [
+          "pid",
+          "name",
+          "text",
+          "tags",
+          "links"
+        ],
+        "properties": {
+          "pid": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Unique integer identifier for the passage."
+          },
+          "name": {
+            "type": "string",
+            "description": "Unique passage title or identifier."
+          },
+          "text": {
+            "type": "string",
+            "description": "Narrative text and content of the passage."
+          },
+          "tags": {
+            "type": "array",
+            "description": "List of tag strings associated with the passage.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "links": {
+            "type": "array",
+            "description": "List of outgoing choices and links to other passages.",
+            "items": {
+              "type": "object",
+              "required": [
+                "text",
+                "target"
+              ],
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Display text / label for the choice."
+                },
+                "target": {
+                  "type": "string",
+                  "description": "Target passage name."
+                },
+                "raw": {
+                  "type": "string",
+                  "description": "Original raw syntax if preserved."
+                }
+              }
+            }
+          },
+          "variables": {
+            "type": "object",
+            "description": "Key-value variable mutations extracted or assigned in this passage."
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Parsed scene metadata (location, faction, intensity, mode, terminal, etc.)."
+          },
+          "position": {
+            "type": "object",
+            "description": "2D canvas position coordinates for Twine visualization.",
+            "properties": {
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              }
+            }
+          },
+          "size": {
+            "type": "object",
+            "description": "Passage card dimensions.",
+            "properties": {
+              "width": {
+                "type": "number"
+              },
+              "height": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
