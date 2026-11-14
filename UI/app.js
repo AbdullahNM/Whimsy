@@ -2357,8 +2357,10 @@ function setupDockResizer() {
     isDragging = true;
     startY = e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0].clientY) || 0;
     startHeight = actionDock.getBoundingClientRect().height;
-    document.body.style.userSelect = 'none';
-    document.body.style.cursor = 'row-resize';
+    if (document.body && document.body.style) {
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'row-resize';
+    }
   }
 
   function onPointerMove(e) {
@@ -2366,28 +2368,38 @@ function setupDockResizer() {
     const clientY = e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0].clientY) || 0;
     const delta = startY - clientY;
     const minH = 100;
-    const maxH = Math.floor(window.innerHeight * 0.75);
+    const maxH = typeof window !== 'undefined' && window.innerHeight ? Math.floor(window.innerHeight * 0.75) : 400;
     const newH = Math.max(minH, Math.min(maxH, startHeight + delta));
     actionDock.style.maxHeight = `${newH}px`;
-    document.documentElement.style.setProperty('--dock-max-height', `${newH}px`);
+    if (document.documentElement && document.documentElement.style) {
+      document.documentElement.style.setProperty('--dock-max-height', `${newH}px`);
+    }
   }
 
   function onPointerUp() {
     if (!isDragging) return;
     isDragging = false;
-    document.body.style.userSelect = '';
-    document.body.style.cursor = '';
-    const currentHeight = actionDock.getBoundingClientRect().height;
-    localStorage.setItem('cyoa_dock_height', Math.round(currentHeight));
+    if (document.body && document.body.style) {
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    }
+    const currentHeight = actionDock.getBoundingClientRect ? actionDock.getBoundingClientRect().height : 250;
+    if (typeof localStorage !== 'undefined' && localStorage.setItem) {
+      localStorage.setItem('cyoa_dock_height', Math.round(currentHeight));
+    }
   }
 
-  resizer.addEventListener('mousedown', onPointerDown);
-  window.addEventListener('mousemove', onPointerMove);
-  window.addEventListener('mouseup', onPointerUp);
+  if (resizer.addEventListener) {
+    resizer.addEventListener('mousedown', onPointerDown);
+    resizer.addEventListener('touchstart', onPointerDown, { passive: true });
+  }
 
-  resizer.addEventListener('touchstart', onPointerDown, { passive: true });
-  window.addEventListener('touchmove', onPointerMove, { passive: true });
-  window.addEventListener('touchend', onPointerUp);
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('mouseup', onPointerUp);
+    window.addEventListener('touchmove', onPointerMove, { passive: true });
+    window.addEventListener('touchend', onPointerUp);
+  }
 
   if (toggleCollapseBtn) {
     toggleCollapseBtn.addEventListener('click', (e) => {
