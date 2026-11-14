@@ -1,0 +1,167 @@
+{
+  "action": "Option 3",
+  "config": {
+    "operational_mode": "classic_cyoa",
+    "seed": 42
+  },
+  "description": "Player selects Option 3 to confer with companions, relieving stress.",
+  "expected_outcome": {
+    "clocks_advanced": [],
+    "effects": [
+      {
+        "current": 4,
+        "previous": 3,
+        "type": "turn_advance"
+      },
+      {
+        "current": 7,
+        "delta": -5,
+        "previous": 12,
+        "target": "progression.stress",
+        "type": "stat_change"
+      },
+      {
+        "target": "public_state.flags.conferred_with_companions",
+        "type": "flag_set",
+        "value": true
+      },
+      {
+        "delta_minutes": 15,
+        "timeline_stamp": "06:40 Local Cycle",
+        "type": "time_advance"
+      }
+    ],
+    "events": [],
+    "next_state": {
+      "campaign_id": "template_campaign",
+      "clocks": [
+        {
+          "current": 1,
+          "id": "contract_deadline",
+          "label": "Contract deadline",
+          "max": 4,
+          "visibility": "known"
+        }
+      ],
+      "offered_choices": [
+        {
+          "index": 1,
+          "text": "Press forward along your primary path."
+        },
+        {
+          "index": 2,
+          "text": "Inspect your immediate environment for hidden clues or resources."
+        },
+        {
+          "index": 3,
+          "text": "Confer with your companions to consolidate strategy."
+        },
+        {
+          "index": 4,
+          "text": "Rest and recover your somatic vitals before proceeding."
+        }
+      ],
+      "pacing_state": {
+        "elapsed_time_minutes": 40,
+        "narrative_intensity": 1,
+        "timeline_stamp": "06:40 Local Cycle",
+        "zoom_level": "detailed_scene"
+      },
+      "progression": {
+        "checkpoint_max": 5,
+        "checkpoint_tokens": 5,
+        "energy": 90,
+        "energy_max": 100,
+        "stress": 7,
+        "stress_max": 100
+      },
+      "public_state": {
+        "conditions": [],
+        "flags": {
+          "conferred_with_companions": true
+        },
+        "open_threads": []
+      },
+      "purse": {
+        "credits": 500,
+        "display": "500 ₡"
+      },
+      "scene_anchor": {
+        "context": "Conferring",
+        "location": "Staging Room A",
+        "time": "06:25 Local Cycle"
+      },
+      "schema_version": 2,
+      "timeline": "Act I",
+      "turn": 4
+    },
+    "offered_choices": [
+      {
+        "index": 1,
+        "text": "Press forward along your primary path."
+      },
+      {
+        "index": 2,
+        "text": "Inspect your immediate environment for hidden clues or resources."
+      },
+      {
+        "index": 3,
+        "text": "Confer with your companions to consolidate strategy."
+      },
+      {
+        "index": 4,
+        "text": "Rest and recover your somatic vitals before proceeding."
+      }
+    ],
+    "progression_delta": {
+      "stress": -5
+    },
+    "resources_delta": {},
+    "version": 1
+  },
+  "id": "fixture_03_classic_confer",
+  "name": "Classic Turn Option 3 Confer",
+  "state": {
+    "campaign_id": "template_campaign",
+    "clocks": [
+      {
+        "current": 1,
+        "id": "contract_deadline",
+        "label": "Contract deadline",
+        "max": 4,
+        "visibility": "known"
+      }
+    ],
+    "pacing_state": {
+      "elapsed_time_minutes": 25,
+      "narrative_intensity": 1,
+      "timeline_stamp": "06:25 Local Cycle",
+      "zoom_level": "detailed_scene"
+    },
+    "progression": {
+      "checkpoint_max": 5,
+      "checkpoint_tokens": 5,
+      "energy": 90,
+      "energy_max": 100,
+      "stress": 12,
+      "stress_max": 100
+    },
+    "public_state": {
+      "conditions": [],
+      "flags": {},
+      "open_threads": []
+    },
+    "purse": {
+      "credits": 500,
+      "display": "500 ₡"
+    },
+    "scene_anchor": {
+      "context": "Conferring",
+      "location": "Staging Room A",
+      "time": "06:25 Local Cycle"
+    },
+    "schema_version": 2,
+    "timeline": "Act I",
+    "turn": 3
+  }
+}

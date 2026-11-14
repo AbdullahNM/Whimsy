@@ -135,30 +135,35 @@ class StyleContractValidator:
         return cls()
 
     @classmethod
-    def validate(cls, text: str, config: Optional[dict] = None) -> Tuple[bool, List[str], float]:
-        """Convenience class method to validate prose with optional config."""
-        return cls(config).validate_prose(text)
+    def validate(cls, text: str, config: Optional[dict] = None, outcome: Optional[Any] = None) -> Tuple[bool, List[str], float]:
+        """Convenience class method to validate prose with optional config and outcome."""
+        return cls(config).validate_prose(text, outcome=outcome)
 
-    def validate_prose(self, text: Any = None, config: Optional[dict] = None) -> Tuple[bool, List[str], float]:
+    def validate_prose(
+        self,
+        text: Any = None,
+        config: Optional[dict] = None,
+        outcome: Optional[Any] = None
+    ) -> Tuple[bool, List[str], float]:
         """
         Validates prose text. Can be called either as an instance method:
-            validator.validate_prose(text, config=None)
+            validator.validate_prose(text, config=None, outcome=None)
         or directly as:
-            StyleContractValidator.validate_prose(text, config=None)
+            StyleContractValidator.validate_prose(text, config=None, outcome=None)
         Returns (is_compliant: bool, violations: list[str], score: float).
         """
         if not isinstance(self, StyleContractValidator):
-            # Called directly on class without instantiation: StyleContractValidator.validate_prose(text, config)
+            # Called directly on class without instantiation: StyleContractValidator.validate_prose(text, config, outcome)
             actual_text = self
             actual_config = text if isinstance(text, dict) else config
             validator = StyleContractValidator(actual_config)
-            return validator.validate_prose(actual_text)
+            return validator.validate_prose(actual_text, outcome=outcome)
 
         effective_config = dict(self.config)
         if isinstance(config, dict):
             effective_config.update(config)
 
-        return self._run_validation(str(text or ""), effective_config)
+        return self._run_validation(str(text or ""), effective_config, outcome=outcome)
 
     def _extract_prose_sentences(self, text: str) -> List[str]:
         """
@@ -218,7 +223,7 @@ class StyleContractValidator:
                 last_end = end
         return selected
 
-    def _run_validation(self, text: str, config: dict) -> Tuple[bool, List[str], float]:
+    def _run_validation(self, text: str, config: dict, outcome: Optional[Any] = None) -> Tuple[bool, List[str], float]:
         violations: List[str] = []
 
         # 1. STEM / Calculus / Physics jargon check
@@ -289,6 +294,11 @@ class StyleContractValidator:
                     f"Average sentence length ({avg_words:.1f} words) exceeds limit ({max_avg_words} words per sentence)"
                 )
 
+        # 8. Fourth-Wall Seal: State change verification against Outcome (R6)
+        if outcome is not None:
+            outcome_vios = self._validate_outcome_alignment(text, outcome)
+            violations.extend(outcome_vios)
+
         # Compliance determination & score calculation
         if not violations:
             is_compliant = True
@@ -300,3 +310,65 @@ class StyleContractValidator:
             score = max(0.0, round(1.0 - penalty, 2))
 
         return is_compliant, violations, score
+
+    def _validate_outcome_alignment(self, text: str, outcome: Any) -> List[str]:
+        """
+        Validates that generated prose and receipts do not assert unearned or
+        uncontained state changes absent from the authoritative Outcome.
+        """
+        from ENGINE.state_parser import StateParser
+
+        vios = []
+        if hasattr(outcome, "to_dict"):
+            out_data = outcome.to_dict()
+        elif isinstance(outcome, dict):
+            out_data = outcome
+        else:
+            out_data = {}
+
+        prog_delta = out_data.get("progression_delta") or {}
+        res_delta = out_data.get("resources_delta") or {}
+
+        # 1. Progression receipt check
+        prog_receipt = StateParser.parse_progression_resolution(text)
+        if prog_receipt and "delta" in prog_receipt:
+            claimed_delta = prog_receipt["delta"]
+            # Check against progression deltas in outcome
+            matching = any(v == claimed_delta for v in prog_delta.values() if isinstance(v, (int, float)))
+            if not matching and claimed_delta != 0:
+                vios.append(
+                    f"Fourth-wall seal violation: Prose asserts progression delta ({claimed_delta}) not contained in outcome"
+                )
+
+        # 2. Currency receipt check
+        curr_receipt = StateParser.parse_currency_resolution(text)
+        if curr_receipt and "delta" in curr_receipt:
+            claimed_delta_str = str(curr_receipt["delta"]).strip()
+            # If outcome has no currency deltas but receipt asserts a non-zero delta
+            if not res_delta and claimed_delta_str and claimed_delta_str != "0":
+                vios.append(
+                    f"Fourth-wall seal violation: Prose asserts currency delta ({claimed_delta_str}) not contained in outcome"
+                )
+
+        # 3. Diegetic prose assertions of state changes
+        assertion_checks = [
+            (r"\b(?:gained|earned|received)\s+(\d+)\s*(?:xp|experience)\b", "xp"),
+            (r"\b(?:gained|earned|received)\s+(\d+)\s*(?:credits?|gold|coins?)\b", "currency"),
+            (r"\bleveled\s+up\b", "level")
+        ]
+        for pat, kind in assertion_checks:
+            for m in re.finditer(pat, text, re.IGNORECASE):
+                if kind == "xp":
+                    val = int(m.group(1))
+                    if prog_delta.get("xp", 0) != val:
+                        vios.append(f"Fourth-wall seal violation: Prose asserts XP gain ({val}) not contained in outcome")
+                elif kind == "currency":
+                    val = int(m.group(1))
+                    awarded = res_delta.get("credits", res_delta.get("gold", 0))
+                    if awarded != val:
+                        vios.append(f"Fourth-wall seal violation: Prose asserts currency gain ({val}) not contained in outcome")
+                elif kind == "level":
+                    if prog_delta.get("level", 0) <= 0:
+                        vios.append("Fourth-wall seal violation: Prose asserts level up not contained in outcome")
+
+        return vios

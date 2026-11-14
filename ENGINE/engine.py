@@ -20,6 +20,7 @@ CORS enabled for local web and PWA clients.
 import os
 import sys
 import json
+import copy
 import urllib.request
 import urllib.error
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -33,6 +34,8 @@ if ROOT_DIR not in sys.path:
 from ENGINE.prompt_assembler import PromptAssembler
 from ENGINE.state_parser import StateParser
 from ENGINE.mode_validator import ModeValidator, validate_action, get_campaign_mode
+from ENGINE.deterministic_core import Core, ActionValidationError, TransitionRejectedError
+from ENGINE.outcome import Outcome
 from ENGINE.pacing_controller import (
     PacingController,
     ZOOM_DETAILED_SCENE,
@@ -209,28 +212,9 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
                 }).encode("utf-8"))
                 return
 
-            # -------------------------------------------------------------
-            # STEP 1: ModeValidator.validate_action()
-            # -------------------------------------------------------------
-            is_valid, error_msg, parsed_action = ModeValidator.validate_action(
-                action=player_action,
-                mode=mode,
-                campaign_id=campaign,
-                root_dir=workspace_root
-            )
-
-            if not is_valid:
-                self._set_cors_headers(400)
-                self.wfile.write(json.dumps({
-                    "error": "INVALID_ACTION",
-                    "message": error_msg,
-                    "mode": mode
-                }).encode("utf-8"))
-                return
-
-            # -------------------------------------------------------------
-            # STEP 2: PacingController.evaluate_focus() & validate_transition()
-            # -------------------------------------------------------------
+            # =============================================================
+            # STEP 1: RESOLVE (Core.resolve — Pure Deterministic Headless Engine)
+            # =============================================================
             pacing_ctrl = PacingController()
 
             pacing_state = payload.get("pacing_state")
@@ -261,77 +245,92 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
             causal_justification = bool(payload.get("causal_justification", False))
             explicit_permission = bool(payload.get("explicit_permission", False))
 
-            is_allowed, transition_reason = pacing_ctrl.validate_transition(
-                current_pacing=pacing_state,
-                proposed_action=player_action,
-                proposed_zoom=proposed_zoom,
-                proposed_time_skip_minutes=proposed_time_skip,
-                proposed_intensity=proposed_intensity,
-                proposed_location=proposed_location,
-                causal_justification=causal_justification,
-                explicit_permission=explicit_permission,
-            )
+            # Assemble state for pure functional Core resolution
+            core_state = None
+            if isinstance(payload.get("state"), dict):
+                core_state = copy.deepcopy(payload["state"])
+            elif campaign_dir and os.path.exists(os.path.join(campaign_dir, "GAMEPLAY", "status.json")):
+                try:
+                    with open(os.path.join(campaign_dir, "GAMEPLAY", "status.json"), "r", encoding="utf-8") as f:
+                        core_state = json.load(f)
+                except Exception:
+                    pass
+            if not core_state:
+                core_state = {
+                    "schema_version": 2,
+                    "campaign_id": campaign or "template_campaign",
+                    "turn": turn_num,
+                    "timeline": "Act I",
+                    "progression": {"checkpoint_tokens": 5, "checkpoint_max": 5},
+                    "purse": {"display": "500 credits"},
+                    "clocks": [],
+                    "scene_anchor": {"location": "Starting Area", "context": "Beginning turn", "time": "Day 1, 08:00"},
+                    "pacing_state": pacing_state,
+                    "public_state": {"flags": {}, "conditions": [], "open_threads": []}
+                }
+            core_state["turn"] = turn_num
+            core_state["pacing_state"] = pacing_state
 
-            if not is_allowed:
+            # Resolve offered choices if not present in state
+            if "offered_choices" not in core_state:
+                core_state["offered_choices"] = ModeValidator.extract_offered_choices(campaign, workspace_root)
+
+            resolve_config = {
+                "operational_mode": mode,
+                "proposed_zoom": proposed_zoom,
+                "proposed_time_skip_minutes": proposed_time_skip,
+                "proposed_intensity": proposed_intensity,
+                "proposed_location": proposed_location,
+                "causal_justification": causal_justification,
+                "explicit_permission": explicit_permission
+            }
+
+            try:
+                outcome = Core.resolve(core_state, player_action, config=resolve_config)
+            except ActionValidationError as e:
+                self._set_cors_headers(400)
+                self.wfile.write(json.dumps({
+                    "error": "INVALID_ACTION",
+                    "message": str(e),
+                    "mode": mode
+                }).encode("utf-8"))
+                return
+            except TransitionRejectedError as e:
                 self._set_cors_headers(400)
                 self.wfile.write(json.dumps({
                     "error": "TRANSITION_REJECTED",
-                    "message": transition_reason,
+                    "message": str(e),
                     "zoom_level": pacing_state.get("zoom_level"),
                     "pacing_state": pacing_state
                 }).encode("utf-8"))
                 return
 
-            # -------------------------------------------------------------
-            # STEP 3: PacingController.advance_time() & event clocks
-            # -------------------------------------------------------------
-            delta_minutes = payload.get("delta_minutes")
-            if delta_minutes is None:
-                if proposed_time_skip > 0:
-                    delta_minutes = proposed_time_skip
-                elif proposed_zoom == ZOOM_TIME_SKIP:
-                    delta_minutes = 480
-                elif proposed_zoom == ZOOM_MONTAGE:
-                    delta_minutes = 1440
-                elif proposed_zoom == ZOOM_SHORT_SUMMARY:
-                    delta_minutes = 30
-                else:
-                    delta_minutes = 10
-            else:
-                delta_minutes = int(delta_minutes)
-
-            updated_pacing, triggered_events = pacing_ctrl.advance_time(
-                current_pacing=pacing_state,
-                delta_minutes=delta_minutes
-            )
-            updated_pacing["zoom_level"] = proposed_zoom
-            updated_pacing["narrative_intensity"] = proposed_intensity
-            if proposed_location:
-                updated_pacing["current_location"] = proposed_location
+            updated_pacing = outcome.next_state.get("pacing_state", pacing_state)
+            triggered_events = outcome.events
 
             # Update engine diagnostic state
             EngineRequestHandler.current_mode = mode
-            EngineRequestHandler.current_zoom = proposed_zoom
+            EngineRequestHandler.current_zoom = updated_pacing.get("zoom_level", proposed_zoom)
             EngineRequestHandler.current_elapsed_time = updated_pacing.get("elapsed_time_minutes", 0)
 
-            # -------------------------------------------------------------
-            # STEP 4: PromptAssembler.build_system_prompt()
-            # -------------------------------------------------------------
+            # =============================================================
+            # STEP 2: NARRATE (LLM or deterministic narrator describing the outcome)
+            # =============================================================
             assembler = PromptAssembler(workspace_root)
             system_prompt = assembler.build_system_prompt(campaign) if campaign else ""
 
-            # -------------------------------------------------------------
-            # STEP 5: Generate narrative response
-            # -------------------------------------------------------------
             response_text = self.generate_turn(
-                campaign, player_action, pacing, turn_num, payload, system_prompt=system_prompt
+                campaign, player_action, pacing, turn_num, payload,
+                system_prompt=system_prompt, outcome=outcome
             )
 
-            # -------------------------------------------------------------
-            # STEP 6: StyleContractValidator.validate_prose() & Progression Pacing Check
-            # -------------------------------------------------------------
+            # =============================================================
+            # STEP 3: VALIDATE (StyleContract + fourth-wall seal vs outcome)
+            # =============================================================
             style_validator = StyleContractValidator.from_campaign(campaign, workspace_root)
-            is_style_valid, violations, style_score = style_validator.validate_prose(response_text)
+            is_style_valid, violations, style_score = style_validator.validate_prose(
+                response_text, outcome=outcome
+            )
 
             # Validate progression pacing against Zero Micro-Scene Rule
             progression_data = StateParser.parse_progression_resolution(response_text)
@@ -340,14 +339,14 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
             if progression_data and "delta" in progression_data:
                 scene_type = updated_pacing.get("scene_type", "exploration")
                 progression_valid, progression_warning = pacing_ctrl.validate_progression_pacing(
-                    zoom_level=proposed_zoom,
+                    zoom_level=updated_pacing.get("zoom_level", proposed_zoom),
                     scene_type=scene_type,
                     delta=progression_data["delta"]
                 )
 
-            # -------------------------------------------------------------
-            # STEP 7: TransactionManager stages mutations and commits atomically
-            # -------------------------------------------------------------
+            # =============================================================
+            # STEP 4: PERSIST (TransactionManager stages mutations and commits atomically)
+            # =============================================================
             idempotency_token = TransactionManager.generate_transaction_id(turn_num, player_action)
 
             committed_record = None
@@ -367,34 +366,27 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
                 tx_mgr.current_action = player_action
 
                 should_commit = payload.get("commit", True)
-                # Avoid modifying template_campaign repository files during unconfigured calls
                 if campaign == "template_campaign" and "campaign_dir" not in payload and not payload.get("commit"):
                     should_commit = False
 
                 if campaign_dir and os.path.isdir(campaign_dir) and should_commit:
+                    # Stage authoritative post-resolution next_state into status.json
+                    status_json_rel = "GAMEPLAY/status.json"
+                    tx_mgr.stage(status_json_rel, outcome.next_state)
+
                     tx_result = tx_mgr.execute_narrative_turn(
                         campaign_dir=campaign_dir,
                         turn=turn_num,
                         action=player_action,
                         gm_output=response_text,
                         metadata={
+                            "outcome": outcome.to_dict(),
                             "pacing_state": updated_pacing,
-                            "zoom_level": proposed_zoom,
-                            "narrative_intensity": proposed_intensity,
+                            "zoom_level": updated_pacing.get("zoom_level", proposed_zoom),
+                            "narrative_intensity": updated_pacing.get("narrative_intensity", proposed_intensity),
                             "idempotency_token": idempotency_token
                         }
                     )
-                    # Persist pacing_state in status.json
-                    status_path = os.path.join(campaign_dir, "GAMEPLAY", "status.json")
-                    if os.path.exists(status_path):
-                        try:
-                            with open(status_path, "r", encoding="utf-8") as f:
-                                s_data = json.load(f)
-                            s_data["pacing_state"] = updated_pacing
-                            with open(status_path, "w", encoding="utf-8") as f:
-                                json.dump(s_data, f, indent=2)
-                        except Exception:
-                            pass
 
             self._set_cors_headers(200)
             self.wfile.write(json.dumps({
@@ -402,15 +394,55 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
                 "transaction_id": idempotency_token,
                 "idempotency_token": idempotency_token,
                 "mode": mode,
-                "zoom_level": proposed_zoom,
-                "narrative_intensity": proposed_intensity,
+                "zoom_level": updated_pacing.get("zoom_level", proposed_zoom),
+                "narrative_intensity": updated_pacing.get("narrative_intensity", proposed_intensity),
                 "pacing_state": updated_pacing,
                 "triggered_events": triggered_events,
                 "style_score": style_score,
                 "style_valid": is_style_valid,
                 "progression_valid": progression_valid,
                 "progression_warning": progression_warning,
-                "committed": (tx_result is not None or committed_record is not None)
+                "committed": (tx_result is not None or committed_record is not None),
+                "outcome": outcome.to_dict()
+            }).encode("utf-8"))
+        elif self.path in ["/api/channel", "/api/channel/message"]:
+            from ENGINE.agent_channel import AgentChannelManager
+            content_len = int(self.headers.get("Content-Length", 0))
+            raw_body = self.rfile.read(content_len)
+            try:
+                payload = json.loads(raw_body.decode("utf-8"))
+            except Exception:
+                self._set_cors_headers(400)
+                self.wfile.write(json.dumps({"error": "Invalid JSON"}).encode("utf-8"))
+                return
+
+            campaign = payload.get("campaign", "template_campaign")
+            sender = payload.get("sender", "SHADOW")
+            content = payload.get("content", "")
+            turn = payload.get("turn")
+            recipient = payload.get("recipient")
+            mode = payload.get("mode")
+
+            campaign_dir = os.path.join(ROOT_DIR, "CAMPAIGNS", campaign)
+            if not os.path.isdir(campaign_dir):
+                campaign_dir = os.path.join(os.path.dirname(ROOT_DIR), "whimsy-campaigns", campaign)
+
+            manager = AgentChannelManager(campaign_dir, channel_mode=mode)
+            updated_messages = manager.post_message(
+                sender=sender,
+                content=content,
+                turn=turn,
+                recipient=recipient
+            )
+
+            self._set_cors_headers(200)
+            self.wfile.write(json.dumps({
+                "status": "success",
+                "campaign": campaign,
+                "channel_mode": manager.channel_mode,
+                "file_fallback": True,
+                "file_path": manager.md_path,
+                "messages": updated_messages
             }).encode("utf-8"))
         elif self.path in ["/api/channel", "/api/channel/message"]:
             from ENGINE.agent_channel import AgentChannelManager
@@ -456,7 +488,8 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({"error": "Unknown POST route"}).encode("utf-8"))
 
     def generate_turn(
-        self, campaign: str, action: str, pacing: str, turn: int, payload: dict, system_prompt: str = ""
+        self, campaign: str, action: str, pacing: str, turn: int, payload: dict,
+        system_prompt: str = "", outcome: Outcome = None
     ) -> str:
         # Check if environment or payload has an API key (OpenRouter or Gemini)
         api_key = (
@@ -467,7 +500,12 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
         )
         model = payload.get("model") or os.environ.get("WHIMSY_MODEL")
 
+        outcome_context = ""
+        if outcome:
+            outcome_context = f"\n\n[AUTHORITATIVE CORE OUTCOME (DO NOT MUTATE STATE BEYOND THIS)]:\n{outcome.to_json()}\n"
+
         if api_key:
+            full_system_prompt = (system_prompt + outcome_context) if system_prompt else outcome_context
             is_openrouter = (
                 api_key.startswith("sk-or-")
                 or "OPENROUTER_API_KEY" in os.environ
@@ -475,30 +513,38 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
             )
             if is_openrouter:
                 try:
-                    return self._call_openrouter(api_key, campaign, action, pacing, turn, system_prompt, model=model)
+                    return self._call_openrouter(api_key, campaign, action, pacing, turn, full_system_prompt, model=model)
                 except Exception as e:
                     print(f"[Engine] OpenRouter call failed: {e}. Falling back to rule-based simulation.")
             else:
                 try:
-                    return self._call_cloud_gemini(api_key, campaign, action, pacing, turn, system_prompt)
+                    return self._call_cloud_gemini(api_key, campaign, action, pacing, turn, full_system_prompt)
                 except Exception as e:
                     print(f"[Engine] Cloud Gemini call failed: {e}. Falling back to rule-based simulation.")
 
         # Local Engine Simulation adhering strictly to CORE-002, CORE-003 receipts & numbered choices
         next_turn = turn + 1
-        state = payload.get("state") if isinstance(payload.get("state"), dict) else None
+        state = payload.get("state") if isinstance(payload.get("state"), dict) else (outcome.next_state if outcome else None)
         summary = self._metric_summary(campaign, state)
         sys_line = f"[SYS: Turn {next_turn}" + (f" | {summary}" if summary else "") + " | Checkpoints: 5/5]"
+
+        if outcome and outcome.offered_choices:
+            options_lines = [f"{c.get('index', i+1)}. {c.get('text', '')}" for i, c in enumerate(outcome.offered_choices)]
+            options_str = "\n".join(options_lines)
+        else:
+            options_str = (
+                "1. Press forward along your primary path.\n"
+                "2. Inspect your immediate environment for hidden clues or resources.\n"
+                "3. Confer with your companions to consolidate strategy.\n"
+                "4. Rest and recover your somatic vitals before proceeding."
+            )
 
         # Generic rule-based fallback (campaign-agnostic, deterministic).
         return (
             "Your action resolves cleanly amidst the shifting currents of the adventure. "
             "Taking stock of your surroundings, you observe the immediate ripple effects of your choice.\n\n"
             "### [OPTIONS & TYPABLE REFERENCE]\n"
-            "1. Press forward along your primary path.\n"
-            "2. Inspect your immediate environment for hidden clues or resources.\n"
-            "3. Confer with your companions to consolidate strategy.\n"
-            "4. Rest and recover your somatic vitals before proceeding.\n\n"
+            f"{options_str}\n\n"
             f"{sys_line}"
         )
 
