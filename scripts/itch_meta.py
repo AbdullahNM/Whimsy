@@ -78,7 +78,8 @@ def derive_genre_tags(genre: str) -> list[str]:
 def generate_itch_metadata(
     campaign_id: str,
     out_dir: str = None,
-    root_dir: str = None
+    root_dir: str = None,
+    export_type: str = "single-file"
 ) -> tuple[dict, str]:
     """Generate itch.io metadata json and markdown listing for a campaign.
 
@@ -178,6 +179,7 @@ def generate_itch_metadata(
         "tagline": tagline,
         "description": long_description,
         "genre": genre,
+        "export_type": export_type,
         "tags": tags,
         "embed": embed_settings,
         "mobile_friendly": True,
@@ -276,10 +278,11 @@ def main():
     parser = argparse.ArgumentParser(description="Generate itch.io metadata and listing for a Whimsy campaign.")
     parser.add_argument("--campaign", required=True, help="Campaign ID (e.g. template_campaign)")
     parser.add_argument("--out", default=None, help="Output directory (defaults to dist/<campaign_id>)")
+    parser.add_argument("--export-type", default="single-file", help="Export type (e.g. single-file, zip, html)")
     args = parser.parse_args()
 
     try:
-        metadata, _ = generate_itch_metadata(args.campaign, args.out)
+        metadata, _ = generate_itch_metadata(args.campaign, args.out, export_type=args.export_type)
         out_dest = args.out or os.path.join("dist", args.campaign)
         print(f"Generated itch.io metadata for campaign '{args.campaign}' in {out_dest}/")
         print(f"  - Title: {metadata['title']}")

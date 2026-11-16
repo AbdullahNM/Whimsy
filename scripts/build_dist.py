@@ -391,7 +391,8 @@ def build_dist(
     campaign_id: str,
     out_dir: str = None,
     root_dir: str = None,
-    generate_meta: bool = True
+    generate_meta: bool = True,
+    verify_only: bool = False
 ) -> dict:
     """Build the complete distribution package for a campaign.
 
@@ -436,6 +437,12 @@ def build_dist(
         campaign_dir=camp_dir,
     )
 
+    if verify_only:
+        return {
+            "verified": True,
+            "campaign_id": campaign_id,
+        }
+
     # 3. Write Artefact A: Single self-contained playable .html file
     index_html_path = os.path.join(target_dir, "index.html")
     with open(index_html_path, "w", encoding="utf-8") as f:
@@ -479,14 +486,19 @@ def main():
     parser.add_argument("--campaign", required=True, help="Campaign ID to package (e.g. template_campaign)")
     parser.add_argument("--out", default=None, help="Target output directory (defaults to dist/<campaign_id>)")
     parser.add_argument("--no-meta", action="store_true", help="Skip generating itch_metadata.json and ITCH_LISTING.md")
+    parser.add_argument("--verify-only", action="store_true", help="Perform safety verification without writing artifacts")
     args = parser.parse_args()
 
     try:
         results = build_dist(
             campaign_id=args.campaign,
             out_dir=args.out,
-            generate_meta=not args.no_meta
+            generate_meta=not args.no_meta,
+            verify_only=args.verify_only,
         )
+        if args.verify_only:
+            print(f"Safety verification passed for campaign '{args.campaign}' (R9 verified).")
+            return
         print(f"Distribution build succeeded for campaign '{args.campaign}':")
         print(f"  - Playable Single HTML: {results['index_html']}")
         print(f"  - itch.io Zip Archive:   {results['zip']}")
