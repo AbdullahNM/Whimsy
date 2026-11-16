@@ -166,8 +166,12 @@ class EntityGraph:
         self._extract_wikilinks_and_cross_references(campaign_dir, documents)
 
     def _load_ontology(self, campaign_dir: str) -> None:
-        ont_path = os.path.join(campaign_dir, "ontology.json")
-        if not os.path.exists(ont_path):
+        candidates = [
+            os.path.join(campaign_dir, "ontology.json"),
+            os.path.join(campaign_dir, "WORLD_FOUNDATION", "ontology.json"),
+        ]
+        ont_path = next((c for c in candidates if os.path.exists(c)), None)
+        if not ont_path:
             return
 
         try:
@@ -187,6 +191,29 @@ class EntityGraph:
                 metadata={"archetype": char.get("archetype"), "origin": char.get("origin")}
             )
             self.add_node(node)
+
+        # Entities list support
+        entities = data.get("entities", [])
+        if isinstance(entities, list):
+            for ent in entities:
+                if isinstance(ent, dict):
+                    eid = normalize_id(ent.get("id", ""))
+                    if eid:
+                        node = EntityNode(
+                            id=eid,
+                            name=ent.get("name", eid),
+                            type=ent.get("type", "character"),
+                            category="ONTOLOGY",
+                            metadata={
+                                "faction": ent.get("faction"),
+                                "traits": ent.get("traits"),
+                                "status": ent.get("status"),
+                                "summary": ent.get("summary"),
+                                "archetype": ent.get("archetype"),
+                                "role": ent.get("role")
+                            }
+                        )
+                        self.add_node(node)
 
         cohorts = data.get("cohort_rosters", {})
         for coh_id, coh in cohorts.items():
@@ -209,19 +236,26 @@ class EntityGraph:
                         weight=1.0
                     ))
 
-        # Relational Graph Edges
-        for edge_data in data.get("relational_graph_edges", []):
+        # Relational Graph Edges & Relationships
+        edges = data.get("relational_graph_edges", [])
+        if not edges:
+            edges = data.get("relationships", [])
+        for edge_data in edges:
             src = normalize_id(edge_data.get("source", ""))
             tgt = normalize_id(edge_data.get("target", ""))
             etype = edge_data.get("type", "related_to")
-            desc = edge_data.get("description", "")
+            desc = edge_data.get("description", "") or edge_data.get("context", "")
+            try:
+                weight = float(edge_data.get("weight", 1.0))
+            except (ValueError, TypeError):
+                weight = 1.0
             if src in self.nodes and tgt in self.nodes:
                 self.add_edge(EntityEdge(
                     source=src,
                     target=tgt,
                     edge_type=etype,
-                    weight=1.0,
-                    metadata={"description": desc}
+                    weight=weight,
+                    metadata={"description": desc, "context": edge_data.get("context", "")}
                 ))
 
     def _load_world_foundation(self, campaign_dir: str) -> None:

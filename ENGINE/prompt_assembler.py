@@ -229,10 +229,17 @@ class PromptAssembler:
         return "\n\n".join(sections)
 
     def load_campaign_ontology(self, campaign_name: str) -> str:
-        ontology_path = os.path.join(self.campaigns_dir, campaign_name, "ontology.json")
-        if not os.path.exists(ontology_path) and os.path.isdir(campaign_name):
-            ontology_path = os.path.join(campaign_name, "ontology.json")
-        if not os.path.exists(ontology_path):
+        candidates = [
+            os.path.join(self.campaigns_dir, campaign_name, "ontology.json"),
+            os.path.join(self.campaigns_dir, campaign_name, "WORLD_FOUNDATION", "ontology.json"),
+        ]
+        if os.path.isdir(campaign_name):
+            candidates.extend([
+                os.path.join(campaign_name, "ontology.json"),
+                os.path.join(campaign_name, "WORLD_FOUNDATION", "ontology.json"),
+            ])
+        ontology_path = next((c for c in candidates if os.path.exists(c)), None)
+        if not ontology_path:
             return ""
 
         try:
@@ -249,7 +256,10 @@ class PromptAssembler:
                     lines.append(f"- **{r.get('rule_id')}**: {r.get('operational_guardrail')}")
 
             # Characters lookup
-            chars = data.get("characters", {})
+            chars = dict(data.get("characters", {}))
+            for ent in data.get("entities", []):
+                if isinstance(ent, dict) and ent.get("id"):
+                    chars.setdefault(ent["id"], ent)
 
             # Cohort Rosters
             cohorts = data.get("cohort_rosters", {})
@@ -264,13 +274,15 @@ class PromptAssembler:
                     lines.append(f"- **{c.get('cohort_name')}** ({c.get('tactical_doctrine')}): {members_str}")
 
             # Relational Graph (Kinship, Rivalry, Mentorship, Romance)
-            edges = data.get("relational_graph_edges", [])
+            edges = data.get("relational_graph_edges", []) or data.get("relationships", [])
             if edges:
                 lines.append("\n## KEY RELATIONAL GRAPH EDGES (KINSHIP, RIVALRY, MENTORSHIP, ROMANCE)")
                 for e in edges:
                     src = chars.get(e.get("source"), {}).get("name", e.get("source"))
                     tgt = chars.get(e.get("target"), {}).get("name", e.get("target"))
-                    lines.append(f"- {src} --[{e.get('type')}]--> {tgt}: {e.get('description')}")
+                    desc = e.get("description") or e.get("context") or ""
+                    desc_str = f": {desc}" if desc else ""
+                    lines.append(f"- {src} --[{e.get('type')}]--> {tgt}{desc_str}")
 
             return "\n".join(lines)
         except Exception as e:
