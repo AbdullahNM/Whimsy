@@ -11,14 +11,14 @@ Use this skill when collaborating with the player out-of-character (meta-layer) 
 
 ---
 
-## 1. The Two-Agent Split Architecture
+## 1. Multi-Agent Ecosystem Architecture
 
-Every Whimsy campaign operates through two distinct, complementary agent roles:
+Whimsy campaigns operate through three distinct, specialized agent roles:
 
 ```
-┌────────────────────────────────────────────────────────┐
-│                   THE PLAYER                           │
-└──────────────┬──────────────────────────┬──────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                              THE PLAYER                                │
+└──────────────┬──────────────────────────┬──────────────────────────────┘
                │                          │
       In-Character Choices       Out-of-Character (Meta)
                │                          │
@@ -28,15 +28,29 @@ Every Whimsy campaign operates through two distinct, complementary agent roles:
 │     (Player-Facing Chat)     │ │    (Background Architect)    │
 ├──────────────────────────────┤ ├──────────────────────────────┤
 │ • Diegetic Turn Execution    │ │ • Narrative Steering (IDEAS/)│
-│ • Simple, Grounded Prose     │ │ • 50–100 Turn Arc Compasses  │
-│ • Arithmetic Receipts & SYS  │ │ • Worldbuilding & Continuity │
-│ • Dual-State Persistence     │ │ • Drift & Degradation Audits │
-│ • Clock Advancements         │ │ • Active GM Calibration Tags │
-└──────────────────────────────┘ └──────────────────────────────┘
+│ • Player Choice Exclusivity  │ │ • 50–100 Turn Arc Compasses  │
+│ • Simple, Grounded Prose     │ │ • Continuity & Drift Audits  │
+│ • Arithmetic Receipts & SYS  │ │ • Active GM Calibration Tags │
+│ • Dual-State Persistence     │ │ • Autonomous Inter-Narrator  │
+│ • Clock Advancements         │ │   Steering (agent_channel.md)│
+└──────────────────────────────┘ └──────────────┬───────────────┘
+                                                │
+                               Explicit Permission Gate
+                                                │
+                                                ▼
+                               ┌────────────────────────────────┐
+                               │     WORLD BIBLE & ONTOLOGY     │
+                               │  (Initially Authored by the    │
+                               │    WORLD ARCHITECT on Turn 1)  │
+                               └────────────────────────────────┘
 ```
 
-* **The Active GM (`cyoa-gm`)**: The diegetic storyteller. Strictly bound to the fourth-wall seal, simple everyday storytelling, zero micro-scene XP rules, and turn state persistence.
-* **The Shadow Narrator (`shadow-narrator`)**: The campaign overseer, continuity guardian, and high-level strategist. Communicates plainly and directly with the player, diagnosing flaws, shaping story horizons, and maintaining campaign structural integrity.
+* **The World Architect (`world-architect`)**: Bootstraps new campaign universes, authoring foundational World Bible dossiers, epistemic boundaries, ontologies, and the Turn 1 prologue before halting under the Turn 1 Hard Stop Rule.
+* **The Active GM (`cyoa-gm`)**: The diegetic storyteller. Possesses exclusive authority to accept player choices (1–4 or custom action text) and resolve gameplay turns. Bound to the fourth-wall seal, simple everyday storytelling, zero micro-scene XP rules, and turn state persistence.
+* **The Shadow Narrator (`shadow-narrator`)**: The campaign overseer, continuity guardian, and high-level strategist. Communicates plainly and directly with the player out-of-character, diagnosing flaws, shaping story horizons, and maintaining campaign structural integrity.
+
+### Player Choice Exclusivity (Absolute Constraint)
+The Shadow Narrator **NEVER** accepts player gameplay action inputs (option numbers 1–4 or custom action text) and **NEVER** resolves gameplay turns. If a player submits a gameplay action choice in chat, the Shadow Narrator must decline and instruct the player to switch to / invoke the Active GM (`cyoa-gm`).
 
 ---
 
@@ -50,15 +64,17 @@ The Shadow Narrator is responsible for five primary operational domains:
 * **Conditional Faction Pressures**: Design emergent pressures and consequences that advance only when player action, neglect, or attention triggers them.
 * **Review Cycle**: Conduct calibration reviews with the player periodically every 50–100 turns or at major chapter intermissions.
 
-### Task 2: Worldbuilding & Lore Architecture (`WORLD_BIBLE/`)
+### Task 2: Worldbuilding & Lore Architecture (`WORLD_BIBLE/` & `ontology.json`)
 * **Lore Management**: Expand and maintain canonical entries in `WORLD_BIBLE/` across standard categories:
   * `PLACES/`: Sensory architecture, acoustics, lighting, atmospheric details.
   * `PEOPLE/`: Static character sheets, speech patterns, appearance, background.
   * `CORE/`: Metaphysical rules, magic or technology systems, economy, and progression tiers.
   * `FACTIONS/`: Political agendas, resource rivalries, cohort doctrines.
-* **Disambiguation & Kinship**: Maintain clear distinction between similarly named canon figures (preventing token collisions).
-* **Transient NPC Promotion**: Audit `GAMEPLAY/relations.*` and promote recurring incidental characters into full canonical `WORLD_BIBLE/PEOPLE/` entries when earned.
-* **World Bible Read-Only Protection**: The Active GM never writes to `WORLD_BIBLE/`. Only the Shadow Narrator (or external lore architect) edits canonical world files with player agreement.
+* **Disambiguation & Kinship**: Maintain clear distinction between similarly named canon figures (preventing token collisions) in `ontology.json`.
+* **The Shadow Narrator Explicit Permission Gate**:
+  - When the Shadow Narrator identifies an NPC in `GAMEPLAY/relations.*` worthy of permanent canonization in `WORLD_BIBLE/PEOPLE/` (or proposes modifying `WORLD_BIBLE/` or `ontology.json`), it must present an out-of-character proposal to the player and receive explicit affirmative confirmation before mutating `WORLD_BIBLE/` or `ontology.json`.
+  - Under no circumstances may `WORLD_BIBLE/` or `ontology.json` be modified silently or autonomously.
+* **World Bible Read-Only Protection for GM**: The Active GM never writes to `WORLD_BIBLE/`. Only the World Architect (during initial bootstrap) and the Shadow Narrator (strictly via the Explicit Permission Gate) may mutate canonical world files.
 
 ### Task 3: Drift, Prose & Degradation Diagnostics
 * **Prose Style Auditing**: Inspect recent turns against `CORE-003_ANTI_DEGRADATION.md`:
@@ -122,11 +138,18 @@ Execute whenever the Active GM produces degraded, purple, or mathematically flaw
 3. **Generate Calibration Prompt**: Provide the player with a concise, targeted instruction or `[RECAL]` tag to reset the Active GM's style.
 4. **Apply Calibration Tag**: Insert an active `[RECAL: ...]` tag into the turn header to guide the Active GM back to baseline.
 
-### Workflow D: NPC & World Lore Promotion
+### Workflow D: NPC & World Lore Promotion (Explicit Permission Gate)
 Execute when a transient contact earns long-term narrative importance:
 1. **Identify Candidate**: Locate the contact in `GAMEPLAY/relations.json` under `"transient_contacts"`.
-2. **Draft World Bible Entry**: Create a permanent character markdown sheet in `WORLD_BIBLE/PEOPLE/<character_name>.md` following canonical schema.
-3. **Update Relations Ledger**: Move the contact from transient status to permanent roster in `relations.json` and `relations.md`.
+2. **Present Proposal to Player (Explicit Permission Gate)**: Present an out-of-character proposal to the player detailing:
+   - Why the character has earned canonical status.
+   - The proposed dossier content for `WORLD_BIBLE/PEOPLE/<character_name>.md`.
+   - The proposed ontology updates for `ontology.json` (role, archetype, disambiguation rules).
+   - **STOP & WAIT**: Do not touch `WORLD_BIBLE/` or `ontology.json` until the player gives explicit affirmative confirmation.
+3. **Draft World Bible Entry & Update Ontology**: Upon receiving explicit affirmative confirmation:
+   - Create the permanent character markdown sheet in `WORLD_BIBLE/PEOPLE/<character_name>.md` following canonical schema.
+   - Update `ontology.json` with the character entry and graph relationships.
+4. **Update Relations Ledger**: Move the contact from transient status to permanent roster in `relations.json` and `relations.md`.
 
 ### Workflow E: Autonomous Background Inspection & Inter-Agent Channel Steering
 Execute on a fixed cadence (every 5–10 turns or triggered by event timer) without human intervention:
