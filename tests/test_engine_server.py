@@ -187,6 +187,206 @@ class TestEngineServer(unittest.TestCase):
             data = json.loads(resp_body.decode("utf-8"))
             self.assertIn("The shadow recedes", data["response"])
 
+    def test_generate_post_deterministic_remediation_strips_formulaic_closings(self):
+        """Verify that formulaic turn closings are deterministically stripped and validated."""
+        from unittest.mock import patch
+        raw_output_with_closing = (
+            "You step through the archway into the grand vault. "
+            "Dust settles gently around the pedestals. What will you do?\n\n"
+            "### [OPTIONS & TYPABLE REFERENCE]\n"
+            "1. Examine relics.\n"
+            "2. Turn back.\n\n"
+            "[SYS: Turn 2 | Checkpoints: 5/5]"
+        )
+        payload = {
+            "action": "1",
+            "campaign": "template_campaign",
+            "currentTurn": 1,
+            "strict_style_enforcement": True,
+            "max_style_retries": 2
+        }
+        with patch.object(EngineRequestHandler, "_call_model", return_value=raw_output_with_closing) as mock_model:
+            status, headers, resp_body = execute_request(
+                "POST",
+                "/generate",
+                body=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            self.assertEqual(status, 200)
+            data = json.loads(resp_body.decode("utf-8"))
+            self.assertTrue(data.get("style_valid"))
+            self.assertEqual(data.get("style_score"), 1.0)
+            self.assertNotIn("What will you do?", data.get("response", ""))
+            self.assertIn("You step through the archway into the grand vault.", data.get("response", ""))
+            # Deterministic remediation should succeed on the first attempt without re-calling the model
+            self.assertEqual(mock_model.call_count, 1)
+
+    def test_generate_post_strict_style_failure_triggers_reprompt_loop(self):
+        """Verify that style violations that cannot be deterministically stripped trigger re-prompt attempts."""
+        from unittest.mock import patch
+        # 1st call fails due to prohibited STEM jargon (lambda).
+        # 2nd call fixes it and returns valid prose.
+        first_draft_violating = (
+            "The lambda coefficient drifted beyond acceptable limits.\n\n"
+            "### [OPTIONS & TYPABLE REFERENCE]\n"
+            "1. Stabilize the grid.\n"
+            "2. Abort.\n\n"
+            "[SYS: Turn 2 | Checkpoints: 5/5]"
+        )
+        second_draft_clean = (
+            "The energy readings stabilized as you adjusted the primary dial.\n\n"
+            "### [OPTIONS & TYPABLE REFERENCE]\n"
+            "1. Stabilize the grid.\n"
+            "2. Abort.\n\n"
+            "[SYS: Turn 2 | Checkpoints: 5/5]"
+        )
+        payload = {
+            "action": "1",
+            "campaign": "template_campaign",
+            "currentTurn": 1,
+            "strict_style_enforcement": True,
+            "max_style_retries": 2
+        }
+        with patch.object(EngineRequestHandler, "_call_model", side_effect=[first_draft_violating, second_draft_clean]) as mock_model:
+            status, headers, resp_body = execute_request(
+                "POST",
+                "/generate",
+                body=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            self.assertEqual(status, 200)
+            data = json.loads(resp_body.decode("utf-8"))
+            self.assertTrue(data.get("style_valid"))
+            self.assertEqual(data.get("style_score"), 1.0)
+            self.assertIn("The energy readings stabilized", data.get("response", ""))
+            self.assertEqual(mock_model.call_count, 2)
+
+            # Check that the second call received the correction prompt
+            second_call_kwargs = mock_model.call_args_list[1][1]
+            remediated_prompt = second_call_kwargs.get("system_prompt", "")
+            self.assertIn("[STYLE CONTRACT CORRECTION REQUIRED]", remediated_prompt)
+            self.assertIn("lambda", remediated_prompt)
+
+    def test_generate_post_persistent_style_failure_aborts_commit_and_returns_422(self):
+        """Verify that persistent style violations after retries prevent state commit, log telemetry, and return 422."""
+        import tempfile
+        import shutil
+        from unittest.mock import patch
+
+        temp_workspace = tempfile.mkdtemp()
+        try:
+            # Create a mock campaign directory inside temp_workspace
+            camp_dir = os.path.join(temp_workspace, "CAMPAIGNS", "test_style_camp")
+            gameplay_dir = os.path.join(camp_dir, "GAMEPLAY")
+            os.makedirs(gameplay_dir, exist_ok=True)
+            status_json_path = os.path.join(gameplay_dir, "status.json")
+            initial_status = {
+                "turn": 1,
+                "character": {"name": "Hero"},
+                "progression": {"energy": 100, "energy_max": 100, "stress": 0, "stress_max": 100},
+                "pacing_state": {"zoom_level": "detailed_scene", "narrative_intensity": 1, "elapsed_time_minutes": 0}
+            }
+            with open(status_json_path, "w", encoding="utf-8") as f:
+                json.dump(initial_status, f)
+
+            camp_cfg_path = os.path.join(camp_dir, "campaign_config.json")
+            with open(camp_cfg_path, "w", encoding="utf-8") as f:
+                json.dump({
+                    "id": "test_style_camp",
+                    "operational_mode": "classic_cyoa",
+                    "style_contract": {
+                        "strict_style_enforcement": True,
+                        "max_style_retries": 2,
+                        "ban_stem_calculus_jargon": True
+                    }
+                }, f)
+
+            violating_prose = (
+                "The lambda coefficient surged across the terminal.\n\n"
+                "### [OPTIONS & TYPABLE REFERENCE]\n"
+                "1. Override.\n"
+                "2. Cut power.\n\n"
+                "[SYS: Turn 2 | Checkpoints: 5/5]"
+            )
+
+            payload = {
+                "action": "1",
+                "campaign": "test_style_camp",
+                "campaign_dir": camp_dir,
+                "currentTurn": 1,
+                "root_dir": temp_workspace,
+                "commit": True,
+                "strict_style_enforcement": True,
+                "max_style_retries": 2
+            }
+
+            with patch.object(EngineRequestHandler, "_call_model", return_value=violating_prose) as mock_model:
+                status, headers, resp_body = execute_request(
+                    "POST",
+                    "/generate",
+                    body=json.dumps(payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json"}
+                )
+                self.assertEqual(status, 422)
+                data = json.loads(resp_body.decode("utf-8"))
+                self.assertIn("error", data)
+                self.assertEqual(data["error"], "Style contract validation failed after retries")
+                self.assertIn("violations", data)
+                self.assertTrue(len(data["violations"]) > 0)
+                self.assertIn("lambda", str(data["violations"]))
+                self.assertIn("style_score", data)
+                self.assertIn("prose", data)
+
+                # Initial generation + 2 retries = 3 calls
+                self.assertEqual(mock_model.call_count, 3)
+
+                # Verify state was NOT committed:
+                # 1. status.json should remain at turn 1
+                with open(status_json_path, "r", encoding="utf-8") as f:
+                    persisted_status = json.load(f)
+                self.assertEqual(persisted_status["turn"], 1)
+
+                # 2. turn_0002.md or turn_0001.md should NOT exist
+                turn_files = [f for f in os.listdir(gameplay_dir) if f.startswith("turn_")]
+                self.assertEqual(len(turn_files), 0)
+
+                # 3. Telemetry log should record style_commit_aborted=True
+                from ENGINE.telemetry import read_campaign_telemetry
+                tel_records = read_campaign_telemetry(temp_workspace, "test_style_camp")
+                self.assertTrue(len(tel_records) > 0)
+                last_tel = tel_records[-1]
+                self.assertTrue(last_tel.get("style_commit_aborted"))
+        finally:
+            shutil.rmtree(temp_workspace, ignore_errors=True)
+
+    def test_generate_post_non_strict_style_failure_commits_and_returns_200(self):
+        """Verify that style failures with strict_style_enforcement=False commit state and return 200 with warning."""
+        from unittest.mock import patch
+        violating_prose = (
+            "The lambda coefficient drifted.\n\n"
+            "### [OPTIONS & TYPABLE REFERENCE]\n"
+            "1. Advance.\n\n"
+            "[SYS: Turn 2 | Checkpoints: 5/5]"
+        )
+        payload = {
+            "action": "1",
+            "campaign": "template_campaign",
+            "currentTurn": 1,
+            "strict_style_enforcement": False
+        }
+        with patch.object(EngineRequestHandler, "_call_model", return_value=violating_prose) as mock_model:
+            status, headers, resp_body = execute_request(
+                "POST",
+                "/generate",
+                body=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            self.assertEqual(status, 200)
+            data = json.loads(resp_body.decode("utf-8"))
+            self.assertFalse(data.get("style_valid"))
+            # When strict enforcement is False, no re-prompts are made
+            self.assertEqual(mock_model.call_count, 1)
+
 
     def test_channel_api_endpoints(self):
         # Backup existing channel file

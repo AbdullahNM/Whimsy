@@ -111,7 +111,9 @@
     "ban_stem_calculus_jargon": true,
     "ban_decorative_microsfx": true,
     "ban_forced_cliffhangers": true,
-    "ban_narrator_praise": true
+    "ban_narrator_praise": true,
+    "strict_style_enforcement": true,
+    "max_style_retries": 2
   },
   "sidebar": {
     "tabs": [

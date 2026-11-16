@@ -29,6 +29,8 @@ class StyleContractValidator:
         "ban_forced_cliffhangers": True,
         "ban_narrator_praise": True,
         "ban_formulaic_closings": True,
+        "strict_style_enforcement": True,
+        "max_style_retries": 2,
     }
 
     # 1. Banned modern STEM / calculus / physics jargon
@@ -169,6 +171,26 @@ class StyleContractValidator:
             except Exception:
                 pass
         return cls()
+
+    @classmethod
+    def strip_formulaic_closings(cls, text: str) -> str:
+        """
+        Deterministically strips formulaic turn closings from narrative text.
+        Handles closings on standalone lines, at sentence/paragraph ends, or inline.
+        """
+        cleaned = str(text or "")
+        for pat in cls.FORMULAIC_CLOSINGS_PATTERNS:
+            # 1. Whole line containing only formulaic closing
+            cleaned = re.sub(rf"(?m)^[ \t]*{pat}[.!?…\s]*$\n?", "", cleaned, flags=re.IGNORECASE)
+            # 2. Formulaic closing at end of line / sentence
+            cleaned = re.sub(rf"[ \t]*{pat}[.!?…]*(?=[ \t]*\n|\Z)", "", cleaned, flags=re.IGNORECASE)
+            # 3. Formulaic closing inline between words/sentences
+            cleaned = re.sub(rf"[ \t]*{pat}[.!?…]*\s*", " ", cleaned, flags=re.IGNORECASE)
+        # Normalize multiple newlines and trailing whitespace per line
+        lines = [re.sub(r"[ \t]+$", "", line) for line in cleaned.splitlines()]
+        result = "\n".join(lines)
+        result = re.sub(r"\n{3,}", "\n\n", result)
+        return result.strip()
 
     @classmethod
     def validate(

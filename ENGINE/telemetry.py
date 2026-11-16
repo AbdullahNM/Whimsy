@@ -94,6 +94,9 @@ def validate_telemetry_record(record: Dict[str, Any]) -> List[str]:
     if "outcome_state_delta" in record and not isinstance(record["outcome_state_delta"], dict):
         errors.append("Field 'outcome_state_delta' must be a dictionary")
 
+    if "style_commit_aborted" in record and not isinstance(record["style_commit_aborted"], bool):
+        errors.append("Field 'style_commit_aborted' must be a boolean")
+
     return errors
 
 
@@ -111,7 +114,10 @@ def record_turn_telemetry(
     retrieval_hits: int = 0,
     style_violations: Optional[List[Any]] = None,
     outcome_state_delta: Optional[Dict[str, Any]] = None,
-    timestamp: Optional[str] = None
+    timestamp: Optional[str] = None,
+    style_commit_aborted: Optional[bool] = None,
+    style_warning: Optional[str] = None,
+    **kwargs: Any
 ) -> Dict[str, Any]:
     """
     Constructs and appends a structured telemetry event to CAMPAIGNS/<id>/GAMEPLAY/telemetry.jsonl.
@@ -138,6 +144,14 @@ def record_turn_telemetry(
         "style_violations": list(style_violations),
         "outcome_state_delta": dict(outcome_state_delta)
     }
+
+    if style_commit_aborted is not None:
+        record["style_commit_aborted"] = bool(style_commit_aborted)
+    if style_warning is not None:
+        record["style_warning"] = str(style_warning)
+    for k, v in kwargs.items():
+        if k not in record:
+            record[k] = v
 
     errors = validate_telemetry_record(record)
     if errors:
