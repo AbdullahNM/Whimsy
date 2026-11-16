@@ -271,13 +271,21 @@ def check_state_drift(campaign_dir: str) -> Tuple[bool, List[str]]:
     return (len(drift_reasons) > 0, drift_reasons)
 
 
-def reconcile_state(campaign_dir: str, prefer_json: bool = True) -> Dict[str, Any]:
+def reconcile_state(
+    campaign_dir: str,
+    prefer_json: bool = True,
+    authoritative_source: Optional[str] = None,
+    **kwargs: Any
+) -> Dict[str, Any]:
     """
     Synchronizes state between status.json and status.md.
-    When prefer_json=True (default), updates drifted fields in status.md from authoritative status.json.
-    When prefer_json=False, updates status.json from status.md.
+    When prefer_json=True (or authoritative_source="json"), updates drifted fields in status.md from authoritative status.json.
+    When prefer_json=False (or authoritative_source="md"), updates status.json from status.md.
     Returns a dictionary detailing the reconciled fields and actions taken.
     """
+    if authoritative_source is not None:
+        prefer_json = (authoritative_source.strip().lower() == "json")
+
     campaign_dir = os.path.abspath(campaign_dir)
     status_json_path = os.path.join(campaign_dir, "GAMEPLAY", "status.json")
     status_md_path = os.path.join(campaign_dir, "GAMEPLAY", "status.md")
@@ -1107,6 +1115,14 @@ class TransactionManager:
 
         # Success: clean up staging area
         self.clear()
+
+        # Check active turns batch archival if any turn file was committed
+        try:
+            if any("TURNS/ACTIVE" in p.replace("\\", "/") or "turn_" in os.path.basename(p) for p in committed_target_paths):
+                from ENGINE.turn_archiver import archive_active_turns
+                archive_active_turns(target_dir)
+        except Exception as e:
+            logger.warning(f"Turn archival check failed: {e}")
 
         commit_result = {
             "success": True,

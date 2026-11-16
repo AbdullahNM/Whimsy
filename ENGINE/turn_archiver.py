@@ -11,6 +11,32 @@ def get_turn_number(filename: str) -> int:
     match = re.search(r'turn_(\d+)', filename)
     return int(match.group(1)) if match else -1
 
+def archive_active_turns(
+    campaign_dir: str,
+    max_active: int = MAX_ACTIVE_TURNS,
+    baseline: int = ACTIVE_BASELINE_TURNS
+) -> list:
+    """
+    Archives oldest turns from TURNS/ACTIVE to TURNS/ARCHIVE when active turn count
+    reaches or exceeds max_active threshold, pruning down to baseline.
+    Returns list of paths of newly archived files.
+    """
+    active_dir = os.path.join(campaign_dir, "TURNS", "ACTIVE")
+    archive_dir = os.path.join(campaign_dir, "TURNS", "ARCHIVE")
+    os.makedirs(active_dir, exist_ok=True)
+    os.makedirs(archive_dir, exist_ok=True)
+
+    archived = []
+    active_files = sorted(glob.glob(os.path.join(active_dir, "turn_*.md")), key=get_turn_number)
+    if len(active_files) >= max_active:
+        num_to_archive = len(active_files) - baseline
+        turns_to_archive = active_files[:num_to_archive]
+        for fpath in turns_to_archive:
+            dest = os.path.join(archive_dir, os.path.basename(fpath))
+            shutil.move(fpath, dest)
+            archived.append(dest)
+    return archived
+
 def record_turn(campaign_dir: str, turn_number: int, player_input: str, gm_output: str, metadata: dict = None) -> str:
     active_dir = os.path.join(campaign_dir, "TURNS", "ACTIVE")
     archive_dir = os.path.join(campaign_dir, "TURNS", "ARCHIVE")
@@ -31,14 +57,7 @@ def record_turn(campaign_dir: str, turn_number: int, player_input: str, gm_outpu
         f.write("\n".join(content))
 
     # 2. Check for active turns reaching MAX_ACTIVE_TURNS threshold (batch archival)
-    active_files = sorted(glob.glob(os.path.join(active_dir, "turn_*.md")), key=get_turn_number)
-    if len(active_files) >= MAX_ACTIVE_TURNS:
-        # Prune down to ACTIVE_BASELINE_TURNS in a batch (oldest first)
-        num_to_archive = len(active_files) - ACTIVE_BASELINE_TURNS
-        turns_to_archive = active_files[:num_to_archive]
-        for fpath in turns_to_archive:
-            dest = os.path.join(archive_dir, os.path.basename(fpath))
-            shutil.move(fpath, dest)
+    archive_active_turns(campaign_dir)
 
     return turn_file
 
