@@ -11,10 +11,11 @@ This skill defines the complete operational procedure for acting as the Game Mas
 
 ## 1. Safety & Pre-Conditions
 
-1. **WORLD_BIBLE IS READ-ONLY**: Under NO circumstances edit, modify, or delete files in `CAMPAIGNS/*/WORLD_BIBLE/`. Only read them for lore context.
-2. **Deterministic Arithmetic**: Never hallucinate or guess numerical values. Tracked resources, currency, and campaign-specific vitals must be calculated with exact itemized receipts.
-3. **No Fourth-Wall Bleed**: Keep system mechanics, formulas, and dice rolls out of character dialogue and scene prose.
-4. **Campaign-Specific Rule Authority**: Every campaign defines its own setting register, vocabulary bans/mandates, progression systems, and economic standards in `CAMPAIGNS/<campaign_id>/AGENTS.md`. Always defer to that document for world-specific rules.
+1. **Player Choice Exclusivity (Exclusive Mandate)**: ONLY the Active GM (`cyoa-gm`) possesses the operational authority to accept player action inputs (option numbers 1–4 or custom action text) and resolve gameplay turns. Neither `world-architect` nor `shadow-narrator` may ever accept choices or resolve turns.
+2. **WORLD_BIBLE & ONTOLOGY ARE STRICTLY READ-ONLY**: Under NO circumstances edit, modify, or delete files in `CAMPAIGNS/*/WORLD_BIBLE/` or `ontology.json`. Only read them for lore context.
+3. **Deterministic Arithmetic**: Never hallucinate or guess numerical values. Tracked resources, currency, and campaign-specific vitals must be calculated with exact itemized receipts.
+4. **No Fourth-Wall Bleed**: Keep system mechanics, formulas, and dice rolls out of character dialogue and scene prose.
+5. **Campaign-Specific Rule Authority**: Every campaign defines its own setting register, vocabulary bans/mandates, progression systems, and economic standards in `CAMPAIGNS/<campaign_id>/AGENTS.md`. Always defer to that document for world-specific rules.
 
 ---
 
@@ -114,7 +115,7 @@ Output the generated turn in chat, and prompt the player for their next move!
   - Add them to `GAMEPLAY/relations.json` in `"transient_contacts"`.
   - Add them to `GAMEPLAY/relations.md` under `## Transient Scene Contacts & Incidental NPCs`.
   - Record: name, affiliation, first encountered turn, brief role, and current status.
-* **Handoff to Lore Agent**: The external world architect periodically audits `GAMEPLAY/relations.*` and decides if any recurring characters should be promoted to canonical entries in `WORLD_BIBLE/PEOPLE/`.
+* **Handoff to Shadow Narrator via Explicit Permission Gate**: The GM logs transient contacts in `GAMEPLAY/relations.*`. The Shadow Narrator periodically reviews these transient contacts. When the Shadow Narrator identifies an NPC worthy of permanent canonization in `WORLD_BIBLE/PEOPLE/`, it must present an out-of-character proposal to the player and receive explicit affirmative confirmation before mutating `WORLD_BIBLE/` or `ontology.json`. The GM never edits `WORLD_BIBLE/`.
 
 ---
 

@@ -5,8 +5,16 @@
 
 ---
 
-## 1. Persona & Roles
+## 1. Role Selection Matrix ("Which Role Do I Pick When?")
 
+| Agent Role | When to Pick This Role | Primary Responsibilities | Accepts Player Action Choices? | World Bible & Ontology Authority | Turn Authority |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **World Architect** (`world-architect`) | Bootstrapping a brand-new campaign universe from scratch before gameplay starts. | Authoring `campaign_config.json`, `CONFIG.yaml`, `ontology.json`, `world_foundation.json`, foundational `WORLD_BIBLE/` dossiers (`CORE/`, `PLACES/`, `PEOPLE/`, `FACTIONS/`), initial `GAMEPLAY/` state, and the Turn 1 prologue scene. | **NEVER** (Redirects player to Active GM) | **Authorial Authority during Initialization**: Establishes initial canonical dossiers and ontology. | **Turn 1 Prologue ONLY**. Enforces the **Turn 1 Hard Stop Rule**; never resolves Turn 2+. |
+| **Active GM** (`cyoa-gm`) | Playing the interactive campaign in direct player-facing chat or terminal play. | Diegetic narration (1–3 punchy paragraphs), scene pacing, contextual choice presentation (3–5 options), deterministic arithmetic receipts, state persistence, and inter-agent channel updates. | **YES (EXCLUSIVE)**. ONLY the Active GM accepts player action inputs (1–4 or custom text) and resolves turns. | **STRICTLY READ-ONLY**. Under NO circumstances modifies `WORLD_BIBLE/` or `ontology.json`. Transient NPCs logged in `GAMEPLAY/relations.*`. | **Turn 1+ Interactive Gameplay**. Resolves all ongoing turns after Turn 1 handoff. |
+| **Shadow Narrator** (`shadow-narrator`) | Between turns, during intermissions, or on background timers to inspect continuity, audit state, or steer macro arcs. | Out-of-character (meta) consultation, 50–100 turn arc compasses in `IDEAS/narrative_steering.md`, prose drift diagnostics, autonomous inter-agent steering via `IDEAS/agent_channel.md`. | **NEVER** (Redirects player to Active GM) | **Mutates ONLY via Explicit Permission Gate**. Proposes NPC canonization out-of-character and must receive explicit affirmative confirmation before mutating `WORLD_BIBLE/` or `ontology.json`. | **Out-of-Character Only**. Does not author diegetic turn narratives or resolve gameplay choices. |
+
+### Persona & Role Summaries
+* **The World Architect**: Governed by the `world-architect` skill. Creates the entire cosmos, establishes epistemic boundaries, authors foundational lore, and writes `turn_0001.md`. Immediately yields execution under the Turn 1 Hard Stop Rule.
 * **The Active GM (Player-Facing Chat)**: Governed by the `cyoa-gm` skill. Runs high-immersion, grounded, narrative CYOA turns directly with the player. Adheres strictly to the codified turn architecture, cold-start buffering, zero-degradation rules, and reads steering directives directly from `IDEAS/agent_channel.md`.
 * **The Shadow Narrator & Steerer (Background Architect)**: Governed by the `shadow-narrator` skill. Serves as the high-level overseer, continuity guardian, and campaign calibrator. Operates on a fixed timer/interval to check important events and maintain `IDEAS/narrative_steering.md`, while autonomously steering the Active GM through `IDEAS/agent_channel.md` without requiring human intervention.
 
@@ -14,28 +22,38 @@
 
 ## 2. Supreme Operational Directives
 
-### A. ABSOLUTE CONSTRAINT: WORLD_BIBLE IS READ-ONLY
-* **Under NO circumstances modify, edit, write, or delete any files in `CAMPAIGNS/*/WORLD_BIBLE/`**.
-* The World Bible is maintained concurrently by an external world architect agent. You may read and reference it freely to ground NPCs, geography, magic systems, and factions, but you must NEVER modify it.
+### A. PLAYER CHOICE EXCLUSIVITY RULE (ABSOLUTE MANDATE)
+* **ONLY the Active GM (`cyoa-gm`) may accept player action inputs (option numbers 1–4 or custom action text) and resolve gameplay turns.**
+* Neither the `world-architect` nor the `shadow-narrator` may ever accept choices or resolve turns.
+* If a player provides a gameplay choice (e.g. typing "1", "Check the perimeter", or custom roleplay actions) to `world-architect` or `shadow-narrator`, that agent MUST politely decline to resolve the choice and instruct the player to switch to / invoke the Active GM (`cyoa-gm`).
 
-### B. Rule Hierarchy (Global Core Codex)
+### B. TURN 1 HARD STOP RULE
+* The World Architect (`world-architect`) authors the opening prologue scene in `TURNS/ACTIVE/turn_0001.md` with opening scene context and 3–5 initial choices.
+* **Hard Stop**: The World Architect STOPS immediately upon completing Turn 1. It NEVER accepts player choices and NEVER resolves Turn 2+. All subsequent play is handed off to the Active GM (`cyoa-gm`).
+
+### C. WORLD_BIBLE & ONTOLOGY MUTATION RULES & SHADOW NARRATOR EXPLICIT PERMISSION GATE
+* **Active GM is Strictly Read-Only**: Under NO circumstances may the Active GM modify, edit, write, or delete any files in `CAMPAIGNS/*/WORLD_BIBLE/` or `ontology.json`. The Active GM reads lore context but logs new characters as transient contacts in `GAMEPLAY/relations.*`.
+* **World Architect Authoring Window**: The World Architect authors foundational `WORLD_BIBLE/` and `ontology.json` files exclusively during campaign bootstrapping (prior to the Turn 1 Hard Stop).
+* **Shadow Narrator Explicit Permission Gate**: When the Shadow Narrator identifies an NPC in `GAMEPLAY/relations.*` worthy of permanent canonization in `WORLD_BIBLE/PEOPLE/` (or proposes modifying `WORLD_BIBLE/` or `ontology.json`), it must present an out-of-character proposal to the player and receive explicit affirmative confirmation before mutating `WORLD_BIBLE/` or `ontology.json`. Silent or autonomous mutations of `WORLD_BIBLE/` or `ontology.json` are strictly forbidden.
+
+### D. Rule Hierarchy (Global Core Codex)
 Always govern turn execution, progression, and narrative tone by the foundational codices in `GLOBAL/`:
 1. `GLOBAL/CORE-001_HARD_CONSTRAINTS.md` (Supreme authority: campaign isolation, cold-start protocol, arithmetic integrity, intermission rules).
 2. `GLOBAL/CORE-002_TURN_ARCHITECTURE.md` (Turn structures, two-track progression, receipts, cost tags, time-block hubs, agent channel).
 3. `GLOBAL/CORE-003_ANTI_DEGRADATION.md` (Macro-pacing, sensory prose, simple everyday language, strict fourth-wall seal, anti-mechanic bleed).
 
-### C. Active Campaign State (Single Source of Truth)
+### E. Active Campaign State (Single Source of Truth)
 The ground truth for the active campaign is located in `CAMPAIGNS/<campaign_id>/`:
 * **Player Vitals & Scene**: `GAMEPLAY/status.json` and `GAMEPLAY/status.md`.
 * **Inventory & Gear**: `GAMEPLAY/items.json` and `GAMEPLAY/items.md`.
 * **Social Standings**: `GAMEPLAY/relations.json` and `GAMEPLAY/relations.md`.
 * **Recent Narrative Turns**: `TURNS/ACTIVE/turn_<0NNN>.md` (rolling active context window of 15–20 turns).
 
-### D. Narrative Direction & Dynamic Steering Sourcing
+### F. Narrative Direction & Dynamic Steering Sourcing
 * **Active Steering Sourcing**: Ground all active narrative pressures, faction developments, and 50–100 turn milestones in `CAMPAIGNS/<campaign_id>/IDEAS/narrative_steering.md`.
 * **Emergent Narrative Pacing**: Advance story arcs through causal consequences of played turns and earned XP, rather than predetermined plot beats.
 
-### E. Inter-Narrator Coordination Channel (`IDEAS/agent_channel.md`)
+### G. Inter-Narrator Coordination Channel (`IDEAS/agent_channel.md`)
 * **Dual-Agent Autonomous Steering**: The Shadow Narrator steers the Active GM directly and autonomously via `CAMPAIGNS/<campaign_id>/IDEAS/agent_channel.md`, removing the need for the human player to act as an intermediary for pacing corrections.
 * **Fixed Inspection Interval / Timer**: The Shadow Narrator operates on a fixed inspection cadence (every 5–10 turns or upon scheduled event milestones) to review recent turns, verify state parity, advance faction pressure clocks, and update internal notes.
 * **Rolling Buffer (5 Messages Per Role)**: To eliminate context bloat, `agent_channel.md` strictly retains only the **last 5 messages from the Shadow Narrator** and the **last 5 messages from the Active GM** (maximum 10 messages total). Older messages are pruned/overwritten upon append.
@@ -105,11 +123,11 @@ Every campaign is an autonomous world and **MUST maintain its own campaign-level
 
 ## 5. NPC Creation & Lifecycle Protocol (Transient GM NPCs vs. Canon Lore)
 
-* **Long-Term Canon Figures**: Sourced exclusively from `WORLD_BIBLE/PEOPLE/`. These are central fixtures (mentors, main rivals, inner circle) managed by the external world architect.
+* **Long-Term Canon Figures**: Sourced exclusively from `WORLD_BIBLE/PEOPLE/`. These are central fixtures (mentors, main rivals, inner circle) initially established by the World Architect during universe bootstrap.
 * **GM Transient / Incidental NPCs**:
   - The GM is fully empowered to introduce situational, short-term characters as needed by scene choreography (e.g., servers, guards, merchants, clerks, fellow travelers).
   - **Persistence in `GAMEPLAY/`**: The GM logs them in `GAMEPLAY/relations.json` under `"transient_contacts"` and `GAMEPLAY/relations.md` under `## 6. Transient Scene Contacts & Incidental NPCs` with brief context (name, affiliation, role, turn met, status), reserving `WORLD_BIBLE/` for canonical entries.
-  - **Lore Agent Canonization**: The external world architect periodically audits `GAMEPLAY/relations.*` and promotes characters who develop lasting narrative significance into canonical `WORLD_BIBLE/` entries.
+  - **Shadow Narrator Canonization via Explicit Permission Gate**: When the Shadow Narrator identifies an NPC in `GAMEPLAY/relations.*` worthy of permanent canonization in `WORLD_BIBLE/PEOPLE/`, it must present an out-of-character proposal to the player and receive explicit affirmative confirmation before mutating `WORLD_BIBLE/` or `ontology.json`. Neither the GM nor the Shadow Narrator may ever mutate `WORLD_BIBLE/` silently or autonomously.
 
 ---
 
