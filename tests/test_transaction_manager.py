@@ -14,6 +14,7 @@ import sys
 import json
 import shutil
 import tempfile
+import warnings
 import unittest
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -24,7 +25,10 @@ from ENGINE.transaction_manager import (
     TransactionManager,
     TransactionError,
     TransactionValidationError,
-    TransactionRollbackError
+    TransactionRollbackError,
+    StateDriftWarning,
+    check_state_drift,
+    reconcile_state
 )
 
 
@@ -439,6 +443,240 @@ class TestTransactionManager(unittest.TestCase):
         res2 = tm2.commit(self.campaign_dir, tx_data2)
         self.assertTrue(res2["success"])
         self.assertEqual(res2["turn"], 3)
+
+    # --- 7. State Drift Detection & Reconciliation Tests (Issue #32) ---
+
+    def test_check_state_drift_synchronized(self):
+        # Establish canonical full parity between status.json and status.md
+        status_json = json.loads(json.dumps(self.initial_status))
+        status_json["character"] = {"name": "Alex Mercer", "archetype": "Specialist"}
+        with open(os.path.join(self.gameplay_dir, "status.json"), "w", encoding="utf-8") as f:
+            json.dump(status_json, f, indent=2)
+
+        status_md = (
+            "# CURRENT PUBLIC STATE\n\n"
+            "## Scene\n\n"
+            "- **Turn:** 1\n"
+            "- **Protagonist:** Alex Mercer (Specialist)\n"
+            "- **Location:** Staging Room Bay A\n"
+            "- **Purse:** 500 ₡\n"
+        )
+        with open(os.path.join(self.gameplay_dir, "status.md"), "w", encoding="utf-8") as f:
+            f.write(status_md)
+
+        # Test function call
+        has_drift, reasons = check_state_drift(self.campaign_dir)
+        self.assertFalse(has_drift)
+        self.assertEqual(reasons, [])
+
+        # Test TransactionManager class and instance methods
+        tm = TransactionManager(self.campaign_dir)
+        has_drift_inst, reasons_inst = tm.check_state_drift()
+        self.assertFalse(has_drift_inst)
+        self.assertEqual(reasons_inst, [])
+
+        has_drift_cls, reasons_cls = TransactionManager.check_state_drift(self.campaign_dir)
+        self.assertFalse(has_drift_cls)
+        self.assertEqual(reasons_cls, [])
+
+    def test_check_state_drift_mismatches(self):
+        status_json = json.loads(json.dumps(self.initial_status))
+        status_json["character"] = {"name": "Alex Mercer"}
+        with open(os.path.join(self.gameplay_dir, "status.json"), "w", encoding="utf-8") as f:
+            json.dump(status_json, f, indent=2)
+
+        # 1. Turn mismatch
+        drift_turn_md = (
+            "# CURRENT PUBLIC STATE\n\n"
+            "## Scene\n\n"
+            "- **Turn:** 5\n"
+            "- **Protagonist:** Alex Mercer\n"
+            "- **Location:** Staging Room Bay A\n"
+            "- **Purse:** 500 ₡\n"
+        )
+        with open(os.path.join(self.gameplay_dir, "status.md"), "w", encoding="utf-8") as f:
+            f.write(drift_turn_md)
+
+        has_drift, reasons = check_state_drift(self.campaign_dir)
+        self.assertTrue(has_drift)
+        self.assertTrue(any("Turn mismatch" in r for r in reasons))
+
+        # 2. Character name mismatch
+        drift_char_md = (
+            "# CURRENT PUBLIC STATE\n\n"
+            "## Scene\n\n"
+            "- **Turn:** 1\n"
+            "- **Protagonist:** Marcus Vance\n"
+            "- **Location:** Staging Room Bay A\n"
+            "- **Purse:** 500 ₡\n"
+        )
+        with open(os.path.join(self.gameplay_dir, "status.md"), "w", encoding="utf-8") as f:
+            f.write(drift_char_md)
+
+        has_drift, reasons = check_state_drift(self.campaign_dir)
+        self.assertTrue(has_drift)
+        self.assertTrue(any("Character name mismatch" in r for r in reasons))
+
+        # 3. Location mismatch
+        drift_loc_md = (
+            "# CURRENT PUBLIC STATE\n\n"
+            "## Scene\n\n"
+            "- **Turn:** 1\n"
+            "- **Protagonist:** Alex Mercer\n"
+            "- **Location:** Forgotten Catacombs\n"
+            "- **Purse:** 500 ₡\n"
+        )
+        with open(os.path.join(self.gameplay_dir, "status.md"), "w", encoding="utf-8") as f:
+            f.write(drift_loc_md)
+
+        has_drift, reasons = check_state_drift(self.campaign_dir)
+        self.assertTrue(has_drift)
+        self.assertTrue(any("Location mismatch" in r for r in reasons))
+
+        # 4. Purse mismatch
+        drift_purse_md = (
+            "# CURRENT PUBLIC STATE\n\n"
+            "## Scene\n\n"
+            "- **Turn:** 1\n"
+            "- **Protagonist:** Alex Mercer\n"
+            "- **Location:** Staging Room Bay A\n"
+            "- **Purse:** 150 ₡\n"
+        )
+        with open(os.path.join(self.gameplay_dir, "status.md"), "w", encoding="utf-8") as f:
+            f.write(drift_purse_md)
+
+        has_drift, reasons = check_state_drift(self.campaign_dir)
+        self.assertTrue(has_drift)
+        self.assertTrue(any("Currency/purse mismatch" in r for r in reasons))
+
+    def test_reconcile_state_prefer_json_resolves_all_drift(self):
+        status_json = json.loads(json.dumps(self.initial_status))
+        status_json["turn"] = 2
+        status_json["character"] = {"name": "Alex Mercer"}
+        status_json["scene_anchor"]["location"] = "Command Hub Alpha"
+        status_json["purse"]["display"] = "750 ₡"
+        with open(os.path.join(self.gameplay_dir, "status.json"), "w", encoding="utf-8") as f:
+            json.dump(status_json, f, indent=2)
+
+        # status.md has drifted on all 4 fields
+        drift_status_md = (
+            "# CURRENT PUBLIC STATE\n\n"
+            "## Scene\n\n"
+            "- **Turn:** 99\n"
+            "- **Protagonist:** Drifter Vance (Smuggler)\n"
+            "- **Location:** Rust Alley\n"
+            "- **Purse:** `10 ₡`\n"
+        )
+        with open(os.path.join(self.gameplay_dir, "status.md"), "w", encoding="utf-8") as f:
+            f.write(drift_status_md)
+
+        # Verify drift is present
+        has_drift, reasons = check_state_drift(self.campaign_dir)
+        self.assertTrue(has_drift)
+        self.assertEqual(len(reasons), 4)
+
+        # Run reconciliation preferring JSON (authoritative source of truth)
+        rec = reconcile_state(self.campaign_dir, prefer_json=True)
+        self.assertTrue(rec["success"])
+        self.assertTrue(rec["reconciled"])
+        self.assertFalse(rec["has_drift"])
+        self.assertEqual(rec["drift_reasons"], [])
+
+        # Re-check disk status.md
+        with open(os.path.join(self.gameplay_dir, "status.md"), "r", encoding="utf-8") as f:
+            reconciled_md = f.read()
+
+        self.assertIn("- **Turn:** 2", reconciled_md)
+        self.assertIn("- **Protagonist:** Alex Mercer (Smuggler)", reconciled_md)
+        self.assertIn("- **Location:** Command Hub Alpha", reconciled_md)
+        self.assertIn("- **Purse:** `750 ₡`", reconciled_md)
+
+        # Confirm check_state_drift returns clean
+        post_drift, post_reasons = check_state_drift(self.campaign_dir)
+        self.assertFalse(post_drift)
+        self.assertEqual(post_reasons, [])
+
+    def test_reconcile_state_prefer_markdown(self):
+        status_json = json.loads(json.dumps(self.initial_status))
+        status_json["character"] = {"name": "Alex Mercer"}
+        with open(os.path.join(self.gameplay_dir, "status.json"), "w", encoding="utf-8") as f:
+            json.dump(status_json, f, indent=2)
+
+        # Out-of-band markdown edit by author
+        custom_status_md = (
+            "# CURRENT PUBLIC STATE\n\n"
+            "## Scene\n\n"
+            "- **Turn:** 5\n"
+            "- **Protagonist:** Valerie Stone\n"
+            "- **Location:** Orbital Dock\n"
+            "- **Funds:** 1200 ₡\n"
+        )
+        with open(os.path.join(self.gameplay_dir, "status.md"), "w", encoding="utf-8") as f:
+            f.write(custom_status_md)
+
+        # Reconcile preferring markdown
+        rec = reconcile_state(self.campaign_dir, prefer_json=False)
+        self.assertTrue(rec["success"])
+        self.assertFalse(rec["has_drift"])
+
+        # Verify status.json on disk was synchronized from markdown
+        with open(os.path.join(self.gameplay_dir, "status.json"), "r", encoding="utf-8") as f:
+            updated_json = json.load(f)
+
+        self.assertEqual(updated_json["turn"], 5)
+        self.assertEqual(updated_json["character"]["name"], "Valerie Stone")
+        self.assertEqual(updated_json["scene_anchor"]["location"], "Orbital Dock")
+        self.assertEqual(updated_json["purse"]["display"], "1200 ₡")
+
+        # Confirm check_state_drift returns clean
+        post_drift, post_reasons = check_state_drift(self.campaign_dir)
+        self.assertFalse(post_drift)
+        self.assertEqual(post_reasons, [])
+
+    def test_execute_narrative_turn_non_blocking_with_drift_warning(self):
+        # Induce state drift in status.md prior to turn execution
+        drift_status_md = (
+            "# CURRENT PUBLIC STATE\n\n"
+            "## Scene\n\n"
+            "- **Turn:** 99\n"
+            "- **Location:** Corrupted Sector\n"
+        )
+        with open(os.path.join(self.gameplay_dir, "status.md"), "w", encoding="utf-8") as f:
+            f.write(drift_status_md)
+
+        tm = TransactionManager(self.campaign_dir)
+
+        # Turn execution should emit StateDriftWarning without raising an exception or blocking
+        with warnings.catch_warnings(record=True) as captured_warnings:
+            warnings.simplefilter("always")
+            result = tm.execute_narrative_turn(
+                campaign_dir=self.campaign_dir,
+                turn=2,
+                action="Bypass security gate",
+                gm_output="Alex enters code and bypasses gate.\n[SYS: Turn 2 | Initiate]"
+            )
+
+        # 1. Non-blocking success
+        self.assertTrue(result["success"])
+        self.assertEqual(result["status"], "committed")
+        self.assertEqual(result["turn"], 2)
+
+        # 2. StateDriftWarning was logged/warned
+        drift_warnings = [w for w in captured_warnings if issubclass(w.category, StateDriftWarning)]
+        self.assertGreaterEqual(len(drift_warnings), 1)
+
+        # 3. Transaction metadata contains state_drift diagnostics
+        self.assertIn("state_drift", result)
+        self.assertTrue(result["state_drift"]["detected"])
+        self.assertTrue(any("Turn mismatch" in r or "Location mismatch" in r for r in result["state_drift"]["reasons"]))
+
+        # 4. Turn log was created on disk and includes state delta metadata
+        turn_file = os.path.join(self.turns_active_dir, "turn_0002.md")
+        self.assertTrue(os.path.exists(turn_file))
+        with open(turn_file, "r", encoding="utf-8") as f:
+            turn_content = f.read()
+        self.assertIn("state_drift", turn_content)
+        self.assertIn("detected", turn_content)
 
 
 

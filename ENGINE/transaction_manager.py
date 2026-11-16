@@ -18,8 +18,13 @@ import json
 import hashlib
 import copy
 import glob
+import re
+import warnings
+import logging
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any, List, Union
+from typing import Optional, Dict, Any, List, Union, Tuple
+
+logger = logging.getLogger(__name__)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
@@ -42,6 +47,464 @@ class TransactionValidationError(TransactionError):
 class TransactionRollbackError(TransactionError):
     """Raised when commit fails and changes are rolled back."""
     pass
+
+
+class StateDriftWarning(UserWarning):
+    """Warning emitted when semantic state drift is detected between status.json and status.md."""
+    pass
+
+
+def _extract_character_name_json(status_json: Dict[str, Any]) -> Optional[str]:
+    char = status_json.get("character")
+    if isinstance(char, dict):
+        name = char.get("name")
+        if name:
+            return str(name).strip()
+    elif isinstance(char, str) and char.strip():
+        return char.strip()
+
+    protag = status_json.get("protagonist")
+    if isinstance(protag, dict):
+        name = protag.get("name")
+        if name:
+            return str(name).strip()
+    elif isinstance(protag, str) and protag.strip():
+        return protag.strip()
+
+    for key in ("character_name", "protagonist_name", "player_name"):
+        val = status_json.get(key)
+        if val:
+            return str(val).strip()
+    return None
+
+
+def _extract_character_name_md(status_md: str) -> Optional[str]:
+    match = re.search(
+        r'(?:^|[\r\n])\s*[-*]?\s*\*{0,2}\b(?:Protagonist|Character|Hero|Agent|Player)(?:\s+Name)?\b:?\*{0,2}[:\s]+([^\r\n]+)',
+        status_md,
+        re.IGNORECASE
+    )
+    if not match:
+        match = re.search(
+            r'(?:^|[\r\n])\s*[-*]?\s*\*{0,2}\bName\b:?\*{0,2}[:\s]+([^\r\n]+)',
+            status_md,
+            re.IGNORECASE
+        )
+    if match:
+        val = match.group(1).strip()
+        val = re.sub(r'[*_`]', '', val).strip()
+        if "(" in val:
+            val = val.split("(", 1)[0].strip()
+        if val:
+            return val
+    return None
+
+
+def _extract_turn_json(status_json: Dict[str, Any]) -> Optional[int]:
+    turn = status_json.get("turn")
+    if turn is not None:
+        try:
+            return int(turn)
+        except (ValueError, TypeError):
+            pass
+    return None
+
+
+def _extract_turn_md(status_md: str) -> Optional[int]:
+    match = re.search(
+        r'(?:^|[\r\n])\s*[-*]?\s*\*{0,2}\bTurn\b:?\*{0,2}[:\s]+(\d+)',
+        status_md,
+        re.IGNORECASE
+    )
+    if match:
+        try:
+            return int(match.group(1))
+        except (ValueError, TypeError):
+            pass
+    header_match = re.search(r'(?:^|[\r\n])#+\s*Turn\s+(\d+)', status_md, re.IGNORECASE)
+    if header_match:
+        try:
+            return int(header_match.group(1))
+        except (ValueError, TypeError):
+            pass
+    return None
+
+
+def _extract_location_json(status_json: Dict[str, Any]) -> Optional[str]:
+    anchor = status_json.get("scene_anchor")
+    if isinstance(anchor, dict):
+        loc = anchor.get("location")
+        if loc:
+            return str(loc).strip()
+    elif isinstance(anchor, str) and anchor.strip():
+        return anchor.strip()
+
+    loc = status_json.get("location")
+    if loc:
+        return str(loc).strip()
+
+    pacing = status_json.get("pacing_state")
+    if isinstance(pacing, dict):
+        cur_loc = pacing.get("current_location")
+        if cur_loc:
+            return str(cur_loc).strip()
+
+    return None
+
+
+def _extract_location_md(status_md: str) -> Optional[str]:
+    match = re.search(
+        r'(?:^|[\r\n])\s*[-*]?\s*\*{0,2}\b(?:Scene\s+)?(?:Current\s+)?Location\b:?\*{0,2}[:\s]+([^\r\n]+)',
+        status_md,
+        re.IGNORECASE
+    )
+    if match:
+        val = match.group(1).strip()
+        val = re.sub(r'[*_`]', '', val).strip()
+        if val:
+            return val
+    return None
+
+
+def _extract_purse_json(status_json: Dict[str, Any]) -> Optional[str]:
+    purse = status_json.get("purse")
+    if isinstance(purse, dict):
+        disp = purse.get("display")
+        if disp is not None:
+            return str(disp).strip()
+        cred = purse.get("credits")
+        if cred is not None:
+            return str(cred).strip()
+    elif purse is not None:
+        return str(purse).strip()
+
+    funds = status_json.get("funds")
+    if funds is not None:
+        return str(funds).strip()
+
+    curr = status_json.get("currency")
+    if curr is not None:
+        return str(curr).strip()
+
+    return None
+
+
+def _extract_purse_md(status_md: str) -> Optional[str]:
+    match = re.search(
+        r'(?:^|[\r\n])\s*[-*]?\s*\*{0,2}\b(?:Purse|Funds|Currency|Current\s+Coin|Coin)\b:?\*{0,2}[:\s]+([^\r\n]+)',
+        status_md,
+        re.IGNORECASE
+    )
+    if match:
+        val = match.group(1).strip()
+        val = re.sub(r'[*_`]', '', val).strip()
+        if val:
+            return val
+    return None
+
+
+def check_state_drift(campaign_dir: str) -> Tuple[bool, List[str]]:
+    """
+    Checks semantic content parity between status.json and status.md in campaign_dir/GAMEPLAY/.
+    Returns (has_drift: bool, drift_reasons: list[str]).
+    """
+    drift_reasons: List[str] = []
+    campaign_dir = os.path.abspath(campaign_dir)
+    status_json_path = os.path.join(campaign_dir, "GAMEPLAY", "status.json")
+    status_md_path = os.path.join(campaign_dir, "GAMEPLAY", "status.md")
+
+    if not os.path.exists(status_json_path):
+        drift_reasons.append("Missing GAMEPLAY/status.json")
+    if not os.path.exists(status_md_path):
+        drift_reasons.append("Missing GAMEPLAY/status.md")
+
+    if drift_reasons:
+        return True, drift_reasons
+
+    try:
+        with open(status_json_path, "r", encoding="utf-8") as f:
+            status_json = json.load(f)
+    except Exception as e:
+        return True, [f"Unparseable GAMEPLAY/status.json: {e}"]
+
+    try:
+        with open(status_md_path, "r", encoding="utf-8") as f:
+            status_md = f.read()
+    except Exception as e:
+        return True, [f"Unreadable GAMEPLAY/status.md: {e}"]
+
+    # 1. Turn number parity
+    json_turn = _extract_turn_json(status_json)
+    md_turn = _extract_turn_md(status_md)
+    if json_turn is not None and md_turn is not None:
+        if json_turn != md_turn:
+            drift_reasons.append(f"Turn mismatch: status.json has {json_turn}, status.md has {md_turn}")
+    elif md_turn is not None and json_turn is None:
+        drift_reasons.append(f"Turn mismatch: status.md specifies turn {md_turn} but status.json has no turn")
+
+    # 2. Character name parity
+    json_char = _extract_character_name_json(status_json)
+    md_char = _extract_character_name_md(status_md)
+    if json_char is not None and md_char is not None:
+        if json_char.strip().lower() != md_char.strip().lower():
+            drift_reasons.append(f"Character name mismatch: status.json has '{json_char}', status.md has '{md_char}'")
+
+    # 3. Location anchor parity
+    json_loc = _extract_location_json(status_json)
+    md_loc = _extract_location_md(status_md)
+    if json_loc is not None and md_loc is not None:
+        if json_loc.strip().lower() != md_loc.strip().lower():
+            drift_reasons.append(f"Location mismatch: status.json has '{json_loc}', status.md has '{md_loc}'")
+
+    # 4. Currency/Purse display (if present in both)
+    json_purse = _extract_purse_json(status_json)
+    md_purse = _extract_purse_md(status_md)
+    if json_purse is not None and md_purse is not None:
+        norm_json = re.sub(r'\s+', ' ', json_purse).strip().lower()
+        norm_md = re.sub(r'\s+', ' ', md_purse).strip().lower()
+        if norm_json != norm_md:
+            digits_json = re.sub(r'[^\d]', '', norm_json)
+            digits_md = re.sub(r'[^\d]', '', norm_md)
+            if not digits_json or not digits_md or digits_json != digits_md:
+                drift_reasons.append(f"Currency/purse mismatch: status.json has '{json_purse}', status.md has '{md_purse}'")
+
+    return (len(drift_reasons) > 0, drift_reasons)
+
+
+def reconcile_state(campaign_dir: str, prefer_json: bool = True) -> Dict[str, Any]:
+    """
+    Synchronizes state between status.json and status.md.
+    When prefer_json=True (default), updates drifted fields in status.md from authoritative status.json.
+    When prefer_json=False, updates status.json from status.md.
+    Returns a dictionary detailing the reconciled fields and actions taken.
+    """
+    campaign_dir = os.path.abspath(campaign_dir)
+    status_json_path = os.path.join(campaign_dir, "GAMEPLAY", "status.json")
+    status_md_path = os.path.join(campaign_dir, "GAMEPLAY", "status.md")
+
+    reconciled_fields: Dict[str, Any] = {}
+    actions: List[str] = []
+
+    # Read status.json
+    status_json: Dict[str, Any] = {}
+    if os.path.exists(status_json_path):
+        try:
+            with open(status_json_path, "r", encoding="utf-8") as f:
+                status_json = json.load(f)
+        except Exception as e:
+            return {
+                "success": False,
+                "reconciled": False,
+                "prefer_json": prefer_json,
+                "error": f"Failed to read status.json: {e}",
+                "reconciled_fields": {},
+                "actions": [],
+                "actions_taken": [],
+                "has_drift": True
+            }
+
+    # Read status.md
+    status_md = ""
+    if os.path.exists(status_md_path):
+        try:
+            with open(status_md_path, "r", encoding="utf-8") as f:
+                status_md = f.read()
+        except Exception as e:
+            return {
+                "success": False,
+                "reconciled": False,
+                "prefer_json": prefer_json,
+                "error": f"Failed to read status.md: {e}",
+                "reconciled_fields": {},
+                "actions": [],
+                "actions_taken": [],
+                "has_drift": True
+            }
+
+    # If status.md is missing and prefer_json=True, generate a new one
+    if not status_md and prefer_json and status_json:
+        turn_val = _extract_turn_json(status_json) or 1
+        char_val = _extract_character_name_json(status_json) or "Unknown Agent"
+        loc_val = _extract_location_json(status_json) or "Unknown Location"
+        purse_val = _extract_purse_json(status_json) or "0"
+        status_md = (
+            f"# CURRENT PUBLIC STATE\n\n"
+            f"## Scene\n\n"
+            f"- **Turn:** {turn_val}\n"
+            f"- **Protagonist:** {char_val}\n"
+            f"- **Location:** {loc_val}\n"
+            f"- **Purse:** {purse_val}\n"
+        )
+        os.makedirs(os.path.dirname(status_md_path), exist_ok=True)
+        with open(status_md_path, "w", encoding="utf-8") as f:
+            f.write(status_md)
+        actions.append("Generated GAMEPLAY/status.md from status.json")
+        reconciled_fields["status_md"] = "generated"
+        return {
+            "success": True,
+            "reconciled": True,
+            "prefer_json": prefer_json,
+            "reconciled_fields": reconciled_fields,
+            "actions": actions,
+            "actions_taken": actions,
+            "has_drift": False
+        }
+
+    json_turn = _extract_turn_json(status_json)
+    md_turn = _extract_turn_md(status_md)
+    json_char = _extract_character_name_json(status_json)
+    md_char = _extract_character_name_md(status_md)
+    json_loc = _extract_location_json(status_json)
+    md_loc = _extract_location_md(status_md)
+    json_purse = _extract_purse_json(status_json)
+    md_purse = _extract_purse_md(status_md)
+
+    if prefer_json:
+        updated_status_md = status_md
+
+        # 1. Turn
+        if json_turn is not None and md_turn != json_turn:
+            turn_pattern = r'((?:^|[\r\n])\s*[-*]?\s*\*{0,2}\bTurn\b:?\*{0,2}[:\s]+)\d+'
+            if re.search(turn_pattern, updated_status_md, re.IGNORECASE):
+                updated_status_md = re.sub(
+                    turn_pattern,
+                    rf'\g<1>{json_turn}',
+                    updated_status_md,
+                    count=1,
+                    flags=re.IGNORECASE
+                )
+                reconciled_fields["turn"] = {"from": md_turn, "to": json_turn}
+                actions.append(f"Updated turn in status.md from {md_turn} to {json_turn}")
+            else:
+                scene_pattern = r'((?:^|[\r\n])## Scene\s*[\r\n]+)'
+                if re.search(scene_pattern, updated_status_md, re.IGNORECASE):
+                    updated_status_md = re.sub(
+                        scene_pattern,
+                        rf'\g<1>- **Turn:** {json_turn}\n',
+                        updated_status_md,
+                        count=1,
+                        flags=re.IGNORECASE
+                    )
+                else:
+                    updated_status_md = f"- **Turn:** {json_turn}\n" + updated_status_md
+                reconciled_fields["turn"] = {"from": md_turn, "to": json_turn}
+                actions.append(f"Inserted turn {json_turn} into status.md")
+
+        # 2. Character Name
+        if json_char is not None and (md_char is None or json_char.strip().lower() != md_char.strip().lower()):
+            char_pattern = r'((?:^|[\r\n])\s*[-*]?\s*\*{0,2}(?:\b(?:Protagonist|Character|Hero|Agent|Player)(?:\s+Name)?\b|\bName\b):?\*{0,2}[:\s]+)([^\r\n]+)'
+            if re.search(char_pattern, updated_status_md, re.IGNORECASE):
+                def _rep_char(m):
+                    prefix = m.group(1)
+                    orig = m.group(2)
+                    role = ""
+                    if "(" in orig:
+                        role = " (" + orig.split("(", 1)[1]
+                    return f"{prefix}{json_char}{role}"
+
+                updated_status_md = re.sub(
+                    char_pattern,
+                    _rep_char,
+                    updated_status_md,
+                    count=1,
+                    flags=re.IGNORECASE
+                )
+                reconciled_fields["character"] = {"from": md_char, "to": json_char}
+                actions.append(f"Updated character name in status.md from '{md_char}' to '{json_char}'")
+
+        # 3. Location
+        if json_loc is not None and (md_loc is None or json_loc.strip().lower() != md_loc.strip().lower()):
+            loc_pattern = r'((?:^|[\r\n])\s*[-*]?\s*\*{0,2}\b(?:Scene\s+)?(?:Current\s+)?Location\b:?\*{0,2}[:\s]+)([^\r\n]+)'
+            if re.search(loc_pattern, updated_status_md, re.IGNORECASE):
+                updated_status_md = re.sub(
+                    loc_pattern,
+                    rf'\g<1>{json_loc}',
+                    updated_status_md,
+                    count=1,
+                    flags=re.IGNORECASE
+                )
+                reconciled_fields["location"] = {"from": md_loc, "to": json_loc}
+                actions.append(f"Updated location in status.md from '{md_loc}' to '{json_loc}'")
+
+        # 4. Currency / Purse
+        if json_purse is not None and (md_purse is None or json_purse.strip().lower() != md_purse.strip().lower()):
+            purse_pattern = r'((?:^|[\r\n])\s*[-*]?\s*\*{0,2}\b(?:Purse|Funds|Currency|Current\s+Coin|Coin)\b:?\*{0,2}[:\s]+)([^\r\n]+)'
+            if re.search(purse_pattern, updated_status_md, re.IGNORECASE):
+                def _rep_purse(m):
+                    prefix = m.group(1)
+                    orig = m.group(2).strip()
+                    if orig.startswith("`") and orig.endswith("`"):
+                        return f"{prefix}`{json_purse}`"
+                    return f"{prefix}{json_purse}"
+
+                updated_status_md = re.sub(
+                    purse_pattern,
+                    _rep_purse,
+                    updated_status_md,
+                    count=1,
+                    flags=re.IGNORECASE
+                )
+                reconciled_fields["purse"] = {"from": md_purse, "to": json_purse}
+                actions.append(f"Updated purse in status.md from '{md_purse}' to '{json_purse}'")
+
+        if updated_status_md != status_md:
+            with open(status_md_path, "w", encoding="utf-8") as f:
+                f.write(updated_status_md)
+
+    else:
+        # prefer_json=False: update status.json from status.md
+        json_modified = False
+        if md_turn is not None and md_turn != json_turn:
+            status_json["turn"] = md_turn
+            reconciled_fields["turn"] = {"from": json_turn, "to": md_turn}
+            actions.append(f"Updated turn in status.json from {json_turn} to {md_turn}")
+            json_modified = True
+
+        if md_char is not None and (json_char is None or md_char.strip().lower() != json_char.strip().lower()):
+            if "character" in status_json and isinstance(status_json["character"], dict):
+                status_json["character"]["name"] = md_char
+            else:
+                status_json["character"] = {"name": md_char}
+            reconciled_fields["character"] = {"from": json_char, "to": md_char}
+            actions.append(f"Updated character name in status.json from '{json_char}' to '{md_char}'")
+            json_modified = True
+
+        if md_loc is not None and (json_loc is None or md_loc.strip().lower() != json_loc.strip().lower()):
+            if "scene_anchor" in status_json and isinstance(status_json["scene_anchor"], dict):
+                status_json["scene_anchor"]["location"] = md_loc
+            else:
+                status_json["scene_anchor"] = {"location": md_loc}
+            reconciled_fields["location"] = {"from": json_loc, "to": md_loc}
+            actions.append(f"Updated location in status.json from '{json_loc}' to '{md_loc}'")
+            json_modified = True
+
+        if md_purse is not None and (json_purse is None or md_purse.strip().lower() != json_purse.strip().lower()):
+            if "purse" in status_json and isinstance(status_json["purse"], dict):
+                status_json["purse"]["display"] = md_purse
+            else:
+                status_json["purse"] = {"display": md_purse}
+            reconciled_fields["purse"] = {"from": json_purse, "to": md_purse}
+            actions.append(f"Updated purse in status.json from '{json_purse}' to '{md_purse}'")
+            json_modified = True
+
+        if json_modified:
+            with open(status_json_path, "w", encoding="utf-8") as f:
+                json.dump(status_json, f, indent=2, ensure_ascii=False)
+
+    post_drift, post_reasons = check_state_drift(campaign_dir)
+    if not actions:
+        actions.append("No state drift detected; status files already in parity.")
+
+    return {
+        "success": True,
+        "reconciled": bool(reconciled_fields),
+        "prefer_json": prefer_json,
+        "reconciled_fields": reconciled_fields,
+        "actions": actions,
+        "actions_taken": actions,
+        "has_drift": post_drift,
+        "drift_reasons": post_reasons
+    }
 
 
 # Mapping friendly aliases to canonical paths relative to campaign_dir
@@ -229,9 +692,30 @@ class TransactionManager:
     ) -> Dict[str, Any]:
         """
         High-level wrapper: stages narrative turn resolution and executes atomic two-phase commit.
+        Checks for semantic state drift before committing. If drift is detected, logs a StateDriftWarning
+        and records drift diagnostics in transaction metadata without blocking turn execution.
         """
-        self.stage_mutations_from_narrative(campaign_dir, turn, action, gm_output, metadata)
-        return self.commit(campaign_dir=campaign_dir, **kwargs)
+        campaign_dir = os.path.abspath(campaign_dir)
+        has_drift, drift_reasons = check_state_drift(campaign_dir)
+
+        turn_metadata = dict(metadata or {})
+        if has_drift:
+            msg = f"State drift detected in campaign '{os.path.basename(campaign_dir)}': {'; '.join(drift_reasons)}"
+            warnings.warn(msg, StateDriftWarning, stacklevel=2)
+            logger.warning(f"StateDriftWarning: {msg}")
+            turn_metadata["state_drift"] = {
+                "detected": True,
+                "reasons": drift_reasons
+            }
+
+        self.stage_mutations_from_narrative(
+            campaign_dir,
+            turn,
+            action,
+            gm_output,
+            metadata=turn_metadata if turn_metadata else None
+        )
+        return self.commit(campaign_dir=campaign_dir, metadata=turn_metadata if turn_metadata else None, **kwargs)
 
     @classmethod
     def get_committed_transaction(
@@ -347,7 +831,8 @@ class TransactionManager:
         transaction_id: str,
         turn: Optional[int],
         action: Optional[str],
-        committed_files: List[str]
+        committed_files: List[str],
+        metadata: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Records the committed transaction into .transaction_log.json atomically.
@@ -364,18 +849,24 @@ class TransactionManager:
             except Exception:
                 pass
 
-        record = {
+        result_obj: Dict[str, Any] = {
+            "status": "committed",
+            "transaction_id": transaction_id,
+            "turn": turn
+        }
+        if metadata and "state_drift" in metadata:
+            result_obj["state_drift"] = metadata["state_drift"]
+
+        record: Dict[str, Any] = {
             "transaction_id": transaction_id,
             "turn": turn,
             "action": action,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "files": [os.path.relpath(f, campaign_dir).replace("\\", "/") for f in committed_files],
-            "result": {
-                "status": "committed",
-                "transaction_id": transaction_id,
-                "turn": turn
-            }
+            "result": result_obj
         }
+        if metadata:
+            record["metadata"] = metadata
 
         log_data["transactions"][transaction_id] = record
         if transaction_id not in log_data.get("history", []):
@@ -441,6 +932,7 @@ class TransactionManager:
         campaign_dir: Optional[str] = None,
         transaction_data: Optional[Dict[str, Any]] = None,
         simulate_failure_at: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -453,6 +945,7 @@ class TransactionManager:
         target_dir = os.path.abspath(target_dir)
 
         # Ingest transaction_data if provided
+        tx_metadata = dict(metadata or {})
         if transaction_data and isinstance(transaction_data, dict):
             if "turn" in transaction_data:
                 self.current_turn = transaction_data["turn"]
@@ -466,6 +959,9 @@ class TransactionManager:
 
             if "transaction_id" in transaction_data:
                 self.current_transaction_id = transaction_data["transaction_id"]
+
+            if "metadata" in transaction_data and isinstance(transaction_data["metadata"], dict):
+                tx_metadata.update(transaction_data["metadata"])
 
             # Staged files in nested dict
             staged = transaction_data.get("staged_files") or transaction_data.get("files")
@@ -598,7 +1094,8 @@ class TransactionManager:
                 self.current_transaction_id,
                 self.current_turn,
                 self.current_action,
-                committed_target_paths
+                committed_target_paths,
+                metadata=tx_metadata if tx_metadata else None
             )
 
         except Exception as e:
@@ -611,7 +1108,7 @@ class TransactionManager:
         # Success: clean up staging area
         self.clear()
 
-        return {
+        commit_result = {
             "success": True,
             "status": "committed",
             "transaction_id": tx_record["transaction_id"],
@@ -620,6 +1117,12 @@ class TransactionManager:
             "files_committed": tx_record.get("files", []),
             "result": tx_record.get("result", {})
         }
+        if tx_metadata:
+            commit_result["metadata"] = tx_metadata
+            if "state_drift" in tx_metadata:
+                commit_result["state_drift"] = tx_metadata["state_drift"]
+
+        return commit_result
 
 
 class _CommitDescriptor:
@@ -644,5 +1147,43 @@ class _CommitDescriptor:
             return _instance_commit
 
 
+class _CheckStateDriftDescriptor:
+    """Descriptor enabling check_state_drift to be called as TransactionManager.check_state_drift(...) or tm.check_state_drift()."""
+    def __get__(self, instance, owner):
+        if instance is None:
+            def _class_check(campaign_dir: str):
+                return check_state_drift(campaign_dir)
+            return _class_check
+        else:
+            def _instance_check(campaign_dir: Optional[str] = None):
+                target_dir = campaign_dir or instance.campaign_dir
+                if not target_dir:
+                    raise ValueError("campaign_dir must be specified.")
+                return check_state_drift(target_dir)
+            return _instance_check
+
+
+class _ReconcileDescriptor:
+    """Descriptor enabling reconcile_state to be called as TransactionManager.reconcile_state(...) or tm.reconcile_state()."""
+    def __get__(self, instance, owner):
+        if instance is None:
+            def _class_reconcile(campaign_dir: str, prefer_json: bool = True, **kwargs):
+                return reconcile_state(campaign_dir, prefer_json=prefer_json, **kwargs)
+            return _class_reconcile
+        else:
+            def _instance_reconcile(campaign_dir: Optional[Union[str, bool]] = None, prefer_json: bool = True, **kwargs):
+                if isinstance(campaign_dir, bool):
+                    prefer_json = campaign_dir
+                    target_dir = instance.campaign_dir
+                else:
+                    target_dir = campaign_dir or instance.campaign_dir
+                if not target_dir:
+                    raise ValueError("campaign_dir must be specified.")
+                return reconcile_state(target_dir, prefer_json=prefer_json, **kwargs)
+            return _instance_reconcile
+
+
 TransactionManager.commit = _CommitDescriptor()
+TransactionManager.check_state_drift = _CheckStateDriftDescriptor()
+TransactionManager.reconcile_state = _ReconcileDescriptor()
 
