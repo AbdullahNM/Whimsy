@@ -309,6 +309,162 @@ class TestStyleContractValidator(unittest.TestCase):
         self.assertTrue(any("Fourth-wall seal violation" in v for v in vios))
         self.assertTrue(any("currency gain (500) not contained in outcome" in v for v in vios))
 
+    # --- 11. Issue #30: Expanded Synonym Permutations & Heuristic Tests ---
+
+    def test_stem_jargon_synonym_variations_fail(self):
+        variations = [
+            ("exponent of talent", "His exponent of talent was recognized by everyone in the guild."),
+            ("quantum", "The relic triggered a sudden quantum fluctuation in the stone chamber."),
+            ("deceleration multiplier", "The device activated its deceleration multiplier to halt the wheel."),
+            ("acceleration multiplier", "An acceleration multiplier propelled the projectile forward."),
+        ]
+        for term, prose in variations:
+            comp, vios, _ = self.validator.validate_prose(prose)
+            self.assertFalse(comp, f"Expected STEM jargon '{term}' to fail validation")
+            self.assertTrue(
+                any("Prohibited STEM/calculus jargon" in v for v in vios),
+                f"Expected jargon violation for '{term}', got: {vios}"
+            )
+
+    def test_narrator_praise_synonym_bypasses_fail(self):
+        bypasses = [
+            ("peerless genius", "He proved himself a peerless genius when deciphering the cryptic glyphs."),
+            ("display was unmatched", "Her swordsmanship display was unmatched in the entire grand pavilion."),
+            ("exhibition of brilliance", "It was an exhibition of brilliance from the untested recruit."),
+            ("masterclass in", "The commander delivered a masterclass in defensive coordination."),
+            ("superhuman feat", "He performed a superhuman feat by holding the falling iron portcullis."),
+            ("unrivaled precision", "With unrivaled precision, the scout severed the signal cord."),
+            ("unrivaled precision (standalone)", "Her unrivaled precision left the veteran archers stunned."),
+        ]
+        for phrase, prose in bypasses:
+            comp, vios, _ = self.validator.validate_prose(prose)
+            self.assertFalse(comp, f"Expected narrator praise '{phrase}' to fail validation")
+            self.assertTrue(
+                any("Narrator praise/editorializing" in v for v in vios),
+                f"Expected narrator praise violation for '{phrase}', got: {vios}"
+            )
+
+    def test_tableware_and_cutlery_micro_sfx_synonyms_fail(self):
+        cutlery_cases = [
+            ("sparks on spoon", "As he drank the warm broth, sparks danced on the spoon."),
+            ("static across bowl", "She paused mid-sentence, static across bowl catching her eye."),
+            ("static danced across bowl", "Static danced across the bowl as the tea was served."),
+            ("sparks on fork", "While enjoying breakfast, sparks danced on the fork."),
+            ("arcs crackled along table", "Arcs crackled along the table as the envoys sat down."),
+            ("embers leaped from goblet", "Embers leaped from her goblet into the empty trencher."),
+            ("currents jumped across cutlery", "Currents jumped across the cutlery set beside the plate."),
+            ("energy sparking off mug", "Blue energy sparking off his mug startled the innkeeper."),
+        ]
+        for desc, prose in cutlery_cases:
+            comp, vios, _ = self.validator.validate_prose(prose)
+            self.assertFalse(comp, f"Expected micro-SFX '{desc}' to fail validation")
+            self.assertTrue(
+                any("Decorative micro-SFX" in v for v in vios),
+                f"Expected micro-SFX violation for '{desc}', got: {vios}"
+            )
+
+    # --- 12. Issue #30: Scene-Context Awareness & Gating Tests ---
+
+    def test_scene_context_gating_blade_clash_in_combat_passes(self):
+        blade_clash_prose = (
+            "The bandit lunged with a heavy cut, but your blade clashed against his iron armor, "
+            "sparks dancing from the impact as you turned the blow aside."
+        )
+        combat_scenes = ["combat", "duel", "clash", "tactical"]
+        for st in combat_scenes:
+            is_compliant, vios, score = self.validator.validate_prose(
+                blade_clash_prose, scene_type=st
+            )
+            self.assertTrue(
+                is_compliant,
+                f"Expected blade clash sparks to pass in scene_type='{st}', got violations: {vios}"
+            )
+            self.assertEqual(vios, [])
+            self.assertEqual(score, 1.0)
+
+    def test_scene_context_gating_blade_clash_in_downtime_fails(self):
+        blade_clash_prose = (
+            "The bandit lunged with a heavy cut, but your blade clashed against his iron armor, "
+            "sparks dancing from the impact as you turned the blow aside."
+        )
+        downtime_scenes = ["downtime", "transit", "conversation", "routine", "exploration", "mundane"]
+        for st in downtime_scenes:
+            is_compliant, vios, _ = self.validator.validate_prose(
+                blade_clash_prose, scene_type=st
+            )
+            self.assertFalse(
+                is_compliant,
+                f"Expected blade clash sparks to be rejected in scene_type='{st}'"
+            )
+            self.assertTrue(any("Decorative micro-SFX" in v for v in vios))
+
+        # Unspecified scene_type defaults to zero-tolerance
+        is_compliant, vios, _ = self.validator.validate_prose(blade_clash_prose, scene_type=None)
+        self.assertFalse(is_compliant, "Expected blade clash sparks to fail when scene_type is unspecified")
+        self.assertTrue(any("Decorative micro-SFX" in v for v in vios))
+
+    def test_cutlery_sparks_fail_in_both_combat_and_downtime(self):
+        prose_spoon = "During the heated confrontation, sparks danced on the spoon beside the hearth."
+        prose_fork = "In the thick of the fray, sparks danced on the fork on the tavern counter."
+        prose_bowl = "As the enemies clashed, static danced across the bowl on the shelf."
+
+        test_sentences = [prose_spoon, prose_fork, prose_bowl]
+        scene_types_to_test = ["combat", "duel", "clash", "downtime", "conversation", "transit", None]
+
+        for st in scene_types_to_test:
+            for prose in test_sentences:
+                is_compliant, vios, _ = self.validator.validate_prose(prose, scene_type=st)
+                self.assertFalse(
+                    is_compliant,
+                    f"Expected cutlery micro-SFX to fail in scene_type='{st}' for prose: '{prose}'"
+                )
+                self.assertTrue(
+                    any("Decorative micro-SFX" in v for v in vios),
+                    f"Expected micro-SFX violation in scene_type='{st}', got: {vios}"
+                )
+
+    def test_scene_context_resolved_from_outcome_next_state(self):
+        from ENGINE.outcome import Outcome
+
+        blade_clash_prose = (
+            "Your steel blade clashed against the shield, sparks dancing as you deflected the strike."
+        )
+
+        combat_outcome = Outcome(
+            next_state={"pacing_state": {"scene_type": "combat"}},
+            version=1
+        )
+        is_comp, vios, score = self.validator.validate_prose(blade_clash_prose, outcome=combat_outcome)
+        self.assertTrue(is_comp, f"Expected combat outcome to permit blade clash sparks, got: {vios}")
+        self.assertEqual(score, 1.0)
+
+        downtime_outcome = Outcome(
+            next_state={"pacing_state": {"scene_type": "downtime"}},
+            version=1
+        )
+        is_comp, vios, _ = self.validator.validate_prose(blade_clash_prose, outcome=downtime_outcome)
+        self.assertFalse(is_comp, "Expected downtime outcome to reject blade clash sparks")
+        self.assertTrue(any("Decorative micro-SFX" in v for v in vios))
+
+    def test_scene_context_resolved_from_outcome_metadata(self):
+        from ENGINE.outcome import Outcome
+
+        blade_clash_prose = (
+            "Your steel blade clashed against the shield, sparks dancing as you deflected the strike."
+        )
+
+        outcome_combat_meta = Outcome(version=1)
+        outcome_combat_meta.metadata = {"scene_type": "combat"}
+        is_comp, vios, score = self.validator.validate_prose(blade_clash_prose, outcome=outcome_combat_meta)
+        self.assertTrue(is_comp, f"Expected combat metadata to permit blade clash sparks, got: {vios}")
+        self.assertEqual(score, 1.0)
+
+        outcome_downtime_meta = Outcome(version=1)
+        outcome_downtime_meta.metadata = {"scene_type": "conversation"}
+        is_comp, vios, _ = self.validator.validate_prose(blade_clash_prose, outcome=outcome_downtime_meta)
+        self.assertFalse(is_comp, "Expected conversation metadata to reject blade clash sparks")
+        self.assertTrue(any("Decorative micro-SFX" in v for v in vios))
+
 
 if __name__ == "__main__":
     unittest.main()
