@@ -37,6 +37,11 @@
       "Decide whether to accept the first contract."
     ]
   },
+  "offered_choices": [
+    {"index": 1, "text": "Accept Contract Alpha: Infiltrate through the rooftop ventilation ducts."},
+    {"index": 2, "text": "Accept Contract Beta: Pose as a courier at the main lobby."},
+    {"index": 3, "text": "Delay entry to scan the data packet."}
+  ],
   "clocks": [
     {
       "id": "contract_deadline",

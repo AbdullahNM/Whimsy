@@ -71,6 +71,28 @@ def execute_request(method: str, path: str, body: bytes = b"", headers: dict = N
 
 
 class TestEngineServer(unittest.TestCase):
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls._cleanup_telemetry()
+
+    def setUp(self):
+        super().setUp()
+        self._cleanup_telemetry()
+
+    def tearDown(self):
+        super().tearDown()
+        self._cleanup_telemetry()
+
+    @staticmethod
+    def _cleanup_telemetry():
+        telemetry_path = os.path.join(ROOT_DIR, "CAMPAIGNS", "template_campaign", "GAMEPLAY", "telemetry.jsonl")
+        if os.path.exists(telemetry_path):
+            try:
+                os.remove(telemetry_path)
+            except OSError:
+                pass
+
     def test_health_endpoint(self):
         status, headers, body = execute_request("GET", "/health")
         self.assertEqual(status, 200)

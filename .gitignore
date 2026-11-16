@@ -11,6 +11,8 @@ backups/
 CAMPAIGNS/*
 !CAMPAIGNS/template_campaign/
 !CAMPAIGNS/template_campaign/**
+**/GAMEPLAY/telemetry.jsonl
+CAMPAIGNS/*/GAMEPLAY/telemetry.jsonl
 notebooklm_export/
 takeout_extracted/
 
