@@ -345,7 +345,7 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
             assembler = PromptAssembler(workspace_root)
             system_prompt = assembler.build_system_prompt(campaign) if campaign else ""
 
-            response_text = self.generate_turn(
+            response_text = self._call_model(
                 campaign, player_action, pacing, turn_num, payload,
                 system_prompt=system_prompt, outcome=outcome
             )
@@ -357,6 +357,120 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
             is_style_valid, violations, style_score = style_validator.validate_prose(
                 response_text, outcome=outcome
             )
+
+            # Style enforcement configuration with payload overrides
+            strict_style_enforcement = (
+                payload.get("strict_style_enforcement")
+                if payload.get("strict_style_enforcement") is not None
+                else style_validator.config.get("strict_style_enforcement", True)
+            )
+            strict_style_enforcement = bool(strict_style_enforcement)
+
+            max_style_retries = (
+                payload.get("max_style_retries")
+                if payload.get("max_style_retries") is not None
+                else style_validator.config.get("max_style_retries", 2)
+            )
+            try:
+                max_style_retries = int(max_style_retries)
+            except (ValueError, TypeError):
+                max_style_retries = 2
+
+            if not is_style_valid:
+                # Step A: Attempt deterministic remediation first:
+                # Strip formulaic turn closings (e.g. "What will you do?", "The choice is yours") using regex/string cleaning.
+                cleaned_text = StyleContractValidator.strip_formulaic_closings(response_text)
+                if cleaned_text != response_text:
+                    valid_a, vios_a, score_a = style_validator.validate_prose(
+                        cleaned_text, outcome=outcome
+                    )
+                    if valid_a:
+                        response_text = cleaned_text
+                        is_style_valid = True
+                        violations = vios_a
+                        style_score = score_a
+
+                # Step B: If still invalid and strict_style_enforcement is enabled:
+                if not is_style_valid and strict_style_enforcement:
+                    current_prompt = system_prompt or ""
+                    for _ in range(max_style_retries):
+                        remediation_instruction = (
+                            f"\n\n[STYLE CONTRACT CORRECTION REQUIRED]\n"
+                            f"Your previous draft failed style contract validation with the following violations:\n- "
+                            + "\n- ".join(violations)
+                            + "\n\nRewrite the response resolving the player action while strictly complying with the style contract."
+                        )
+                        retry_prompt = current_prompt + remediation_instruction
+                        retry_response = self._call_model(
+                            campaign, player_action, pacing, turn_num, payload,
+                            system_prompt=retry_prompt, outcome=outcome
+                        )
+                        valid_b, vios_b, score_b = style_validator.validate_prose(
+                            retry_response, outcome=outcome
+                        )
+                        if not valid_b:
+                            cleaned_retry = StyleContractValidator.strip_formulaic_closings(retry_response)
+                            if cleaned_retry != retry_response:
+                                valid_b_clean, vios_b_clean, score_b_clean = style_validator.validate_prose(
+                                    cleaned_retry, outcome=outcome
+                                )
+                                if valid_b_clean:
+                                    retry_response = cleaned_retry
+                                    valid_b = True
+                                    vios_b = vios_b_clean
+                                    score_b = score_b_clean
+
+                        response_text = retry_response
+                        is_style_valid = valid_b
+                        violations = vios_b
+                        style_score = score_b
+
+                        if is_style_valid:
+                            break
+
+                # Step C: If retries are exhausted and is_style_valid is still False:
+                if not is_style_valid:
+                    if strict_style_enforcement:
+                        # DO NOT commit state (do not call execute_narrative_turn, do not mutate status.json or write turn_XXXX.md)
+                        # Log telemetry event with style_commit_aborted=True
+                        try:
+                            from ENGINE.telemetry import record_turn_telemetry
+                            gen_latency = (time.time() - t_gen_start) * 1000
+                            pmt_tokens = int(len(system_prompt.split()) * 1.3) if system_prompt else 0
+                            cmp_tokens = int(len(response_text.split()) * 1.3) if response_text else 0
+                            record_turn_telemetry(
+                                root_dir=workspace_root,
+                                campaign_id=campaign or "template_campaign",
+                                turn=turn_num,
+                                latency_ms=gen_latency,
+                                model=payload.get("model") or "local-heuristic",
+                                operational_mode=mode,
+                                zoom_level=updated_pacing.get("zoom_level", proposed_zoom),
+                                narrative_intensity=updated_pacing.get("narrative_intensity", proposed_intensity),
+                                prompt_tokens=pmt_tokens,
+                                completion_tokens=cmp_tokens,
+                                retrieval_hits=len(triggered_events) if triggered_events else 0,
+                                style_violations=violations if violations else [],
+                                outcome_state_delta=outcome.to_dict() if outcome else {},
+                                style_commit_aborted=True
+                            )
+                        except Exception:
+                            pass
+
+                        self._set_cors_headers(422)
+                        self.wfile.write(json.dumps({
+                            "error": "Style contract validation failed after retries",
+                            "violations": violations,
+                            "style_score": style_score,
+                            "prose": response_text
+                        }).encode("utf-8"))
+                        return
+                    else:
+                        # If not strict: log warning in telemetry and proceed as before
+                        try:
+                            from ENGINE.telemetry import record_turn_telemetry
+                        except Exception:
+                            pass
 
             # Validate progression pacing against Zero Micro-Scene Rule
             progression_data = StateParser.parse_progression_resolution(response_text)
@@ -416,8 +530,7 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
 
             # Record telemetry event
             try:
-                if should_commit:
-                    from ENGINE.telemetry import record_turn_telemetry
+                from ENGINE.telemetry import record_turn_telemetry
                 gen_latency = (time.time() - t_gen_start) * 1000
                 pmt_tokens = int(len(system_prompt.split()) * 1.3) if 'system_prompt' in locals() and system_prompt else 0
                 cmp_tokens = int(len(response_text.split()) * 1.3) if response_text else 0
@@ -433,9 +546,11 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
                     prompt_tokens=pmt_tokens,
                     completion_tokens=cmp_tokens,
                     retrieval_hits=len(triggered_events) if triggered_events else 0,
-                        style_violations=violations if violations else [],
-                        outcome_state_delta=outcome.to_dict() if outcome else {}
-                    )
+                    style_violations=violations if violations else [],
+                    outcome_state_delta=outcome.to_dict() if outcome else {},
+                    style_commit_aborted=False,
+                    style_warning="Style contract validation failed but strict enforcement disabled" if not is_style_valid else None
+                )
             except Exception as tel_err:
                 pass
 
@@ -607,7 +722,7 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
             self._set_cors_headers(404)
             self.wfile.write(json.dumps({"error": "Unknown POST route"}).encode("utf-8"))
 
-    def generate_turn(
+    def _call_model(
         self, campaign: str, action: str, pacing: str, turn: int, payload: dict,
         system_prompt: str = "", outcome: Outcome = None
     ) -> str:
@@ -666,6 +781,15 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
             "### [OPTIONS & TYPABLE REFERENCE]\n"
             f"{options_str}\n\n"
             f"{sys_line}"
+        )
+
+    def generate_turn(
+        self, campaign: str, action: str, pacing: str, turn: int, payload: dict,
+        system_prompt: str = "", outcome: Outcome = None
+    ) -> str:
+        return self._call_model(
+            campaign, action, pacing, turn, payload,
+            system_prompt=system_prompt, outcome=outcome
         )
 
     def _campaign_metrics(self, campaign: str) -> list:
