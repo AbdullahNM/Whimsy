@@ -142,5 +142,11 @@
     "enabled": true,
     "max_passages": 5,
     "char_budget": 16000
+  },
+  "token_budget": {
+    "rules_char_budget": 8000,
+    "world_foundation_char_budget": 6000,
+    "active_turns_budget": 5,
+    "ideas_char_budget": 4000
   }
 }

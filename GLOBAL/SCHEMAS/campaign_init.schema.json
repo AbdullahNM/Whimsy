@@ -229,6 +229,24 @@
           }
         }
       }
+    },
+    "token_budget": {
+      "type": "object",
+      "properties": {
+        "rules_char_budget": { "type": "integer", "minimum": 1 },
+        "world_foundation_char_budget": { "type": "integer", "minimum": 1 },
+        "active_turns_budget": { "type": "integer", "minimum": 1 },
+        "ideas_char_budget": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "char_budget": {
+      "type": "object",
+      "properties": {
+        "rules_char_budget": { "type": "integer", "minimum": 1 },
+        "world_foundation_char_budget": { "type": "integer", "minimum": 1 },
+        "active_turns_budget": { "type": "integer", "minimum": 1 },
+        "ideas_char_budget": { "type": "integer", "minimum": 1 }
+      }
     }
   }
 }
