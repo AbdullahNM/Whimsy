@@ -610,45 +610,6 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
                 "file_path": manager.md_path,
                 "messages": updated_messages
             }).encode("utf-8"))
-        elif self.path in ["/api/channel", "/api/channel/message"]:
-            from ENGINE.agent_channel import AgentChannelManager
-            content_len = int(self.headers.get("Content-Length", 0))
-            raw_body = self.rfile.read(content_len)
-            try:
-                payload = json.loads(raw_body.decode("utf-8"))
-            except Exception:
-                self._set_cors_headers(400)
-                self.wfile.write(json.dumps({"error": "Invalid JSON"}).encode("utf-8"))
-                return
-
-            campaign = payload.get("campaign", "template_campaign")
-            sender = payload.get("sender", "SHADOW")
-            content = payload.get("content", "")
-            turn = payload.get("turn")
-            recipient = payload.get("recipient")
-            mode = payload.get("mode")
-
-            campaign_dir = os.path.join(ROOT_DIR, "CAMPAIGNS", campaign)
-            if not os.path.isdir(campaign_dir):
-                campaign_dir = os.path.join(os.path.dirname(ROOT_DIR), "whimsy-campaigns", campaign)
-
-            manager = AgentChannelManager(campaign_dir, channel_mode=mode)
-            updated_messages = manager.post_message(
-                sender=sender,
-                content=content,
-                turn=turn,
-                recipient=recipient
-            )
-
-            self._set_cors_headers(200)
-            self.wfile.write(json.dumps({
-                "status": "success",
-                "campaign": campaign,
-                "channel_mode": manager.channel_mode,
-                "file_fallback": True,
-                "file_path": manager.md_path,
-                "messages": updated_messages
-            }).encode("utf-8"))
         elif self.path in ["/init_campaign", "/api/campaign/init", "/campaigns/create"]:
             content_len = int(self.headers.get("Content-Length", 0))
             raw_body = self.rfile.read(content_len)
