@@ -102,6 +102,8 @@ class TestSchemas(unittest.TestCase):
             cls.story_graph_schema = json.load(f)
         with open(os.path.join(cls.schemas_dir, "evaluation_rubric.schema.json"), "r") as f:
             cls.evaluation_rubric_schema = json.load(f)
+        with open(os.path.join(cls.schemas_dir, "ontology.schema.json"), "r") as f:
+            cls.ontology_schema = json.load(f)
 
     def _load_json(self, rel_path: str) -> dict:
         full_path = os.path.join(ROOT_DIR, rel_path)
@@ -132,6 +134,69 @@ class TestSchemas(unittest.TestCase):
         errors = SimpleSchemaValidator.validate(wf, self.world_foundation_schema)
         self.assertEqual(errors, [], f"Template world_foundation schema errors: {errors}")
         self.assertEqual(wf["campaign_id"], "template_campaign")
+
+    # --- Ontology Schema Tests ---
+
+    def test_template_ontology_json(self):
+        ontology_data = self._load_json("CAMPAIGNS/template_campaign/WORLD_FOUNDATION/ontology.json")
+        errors = SimpleSchemaValidator.validate(ontology_data, self.ontology_schema)
+        self.assertEqual(errors, [], f"Template ontology schema errors: {errors}")
+        self.assertEqual(ontology_data["campaign_id"], "template_campaign")
+        self.assertEqual(ontology_data["schema_version"], "1.0.0")
+
+        # Also validate with jsonschema library if available
+        try:
+            import jsonschema
+            jsonschema.validate(instance=ontology_data, schema=self.ontology_schema)
+        except ImportError:
+            pass
+
+    def test_campaign_root_ontology_json(self):
+        root_path = "CAMPAIGNS/template_campaign/ontology.json"
+        if os.path.exists(os.path.join(ROOT_DIR, root_path)):
+            ontology_data = self._load_json(root_path)
+            errors = SimpleSchemaValidator.validate(ontology_data, self.ontology_schema)
+            self.assertEqual(errors, [], f"Root ontology schema errors: {errors}")
+            self.assertEqual(ontology_data["campaign_id"], "template_campaign")
+            self.assertEqual(ontology_data["schema_version"], "1.0.0")
+            try:
+                import jsonschema
+                jsonschema.validate(instance=ontology_data, schema=self.ontology_schema)
+            except ImportError:
+                pass
+
+    def test_campaign_agnostic_ontology_entities_and_relationships(self):
+        agnostic_data = {
+            "campaign_id": "test_agnostic_campaign",
+            "schema_version": "1.0.0",
+            "entities": [
+                {
+                    "id": "e_01",
+                    "name": "Operator Vance",
+                    "type": "character",
+                    "faction": "Syndicate",
+                    "traits": ["pragmatic", "veteran"],
+                    "status": "active",
+                    "summary": "Seasoned mission coordinator."
+                }
+            ],
+            "relationships": [
+                {
+                    "source": "e_01",
+                    "target": "e_02",
+                    "type": "MENTORSHIP",
+                    "weight": 0.85,
+                    "context": "Trained operative in signal decoding."
+                }
+            ]
+        }
+        errors = SimpleSchemaValidator.validate(agnostic_data, self.ontology_schema)
+        self.assertEqual(errors, [], f"Agnostic ontology schema errors: {errors}")
+        try:
+            import jsonschema
+            jsonschema.validate(instance=agnostic_data, schema=self.ontology_schema)
+        except ImportError:
+            pass
 
     def test_pacing_state_schema_valid(self):
         status = self._load_json("CAMPAIGNS/template_campaign/GAMEPLAY/status.json")
@@ -196,6 +261,13 @@ class TestSchemas(unittest.TestCase):
         errors = SimpleSchemaValidator.validate(bad_wf, self.world_foundation_schema)
         self.assertTrue(any("missing required property 'immutable_facts'" in e for e in errors))
         self.assertTrue(any("missing required property 'npc_knowledge'" in e for e in errors))
+
+    def test_negative_invalid_ontology_missing_required(self):
+        bad_ontology = {
+            "campaign_id": "bad_campaign"
+        }
+        errors = SimpleSchemaValidator.validate(bad_ontology, self.ontology_schema)
+        self.assertTrue(any("missing required property 'schema_version'" in e for e in errors))
 
     def test_negative_invalid_pacing_zoom_level(self):
         bad_status = {

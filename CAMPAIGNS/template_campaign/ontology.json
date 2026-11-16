@@ -1,5 +1,6 @@
 {
   "campaign_id": "template_campaign",
+  "schema_version": "1.0.0",
   "disambiguation_rules": [
     {
       "rule_id": "NAME-01",
@@ -26,7 +27,10 @@
     "alpha_team": {
       "cohort_name": "Alpha Team",
       "tactical_doctrine": "Recon-first infiltration and measured risk",
-      "members": ["alex_mercer", "handler_cross"]
+      "members": [
+        "alex_mercer",
+        "handler_cross"
+      ]
     }
   },
   "relational_graph_edges": [

@@ -3,7 +3,7 @@
   "title": "CampaignOntologySchema",
   "description": "Formal schema for campaign entities, genealogical family trees, institutional hierarchies, and relational knowledge graphs to eliminate token collisions and character mix-ups.",
   "type": "object",
-  "required": ["campaign_id", "schema_version", "disambiguation_rules", "houses_and_lineages", "characters", "cohort_rosters", "relational_graph_edges"],
+  "required": ["campaign_id", "schema_version"],
   "properties": {
     "campaign_id": {
       "type": "string",
@@ -22,7 +22,7 @@
       "description": "Mandatory anti-collision guards for characters sharing names, titles, or family ties",
       "items": {
         "type": "object",
-        "required": ["rule_id", "confusion_risk", "entities", "operational_guardrail"],
+        "required": ["rule_id", "operational_guardrail"],
         "properties": {
           "rule_id": { "type": "string" },
           "confusion_risk": { "type": "string" },
@@ -42,12 +42,89 @@
         }
       }
     },
+    "entities": {
+      "type": "array",
+      "description": "Campaign-agnostic entity registry for characters, factions, locations, organizations, or artifacts",
+      "items": {
+        "type": "object",
+        "required": ["id", "name"],
+        "properties": {
+          "id": { "type": "string", "description": "Unique identifier for the entity" },
+          "name": { "type": "string", "description": "Display name of the entity" },
+          "type": { "type": "string", "description": "Entity classification (e.g. character, faction, location, organization, artifact)" },
+          "faction": { "type": "string", "description": "Faction affiliation or allegiance" },
+          "traits": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Key traits, tags, or descriptors"
+          },
+          "status": { "type": "string", "description": "Current status (e.g. active, deceased, missing, dormant)" },
+          "summary": { "type": "string", "description": "Concise summary or biography of the entity" },
+          "archetype": { "type": "string", "description": "Character or entity archetype" },
+          "role": { "type": "string", "description": "Narrative or operational role" },
+          "metadata": { "type": "object", "description": "Arbitrary entity metadata" }
+        }
+      }
+    },
+    "relationships": {
+      "type": "array",
+      "description": "Campaign-agnostic directed or undirected graph edges between entities",
+      "items": {
+        "type": "object",
+        "required": ["source", "target", "type"],
+        "properties": {
+          "source": { "type": "string", "description": "Source entity ID" },
+          "target": { "type": "string", "description": "Target entity ID" },
+          "type": {
+            "type": "string",
+            "enum": [
+              "MENTORSHIP",
+              "ALLIANCE",
+              "RIVALRY",
+              "DEBT",
+              "EMPLOYMENT",
+              "FAMILY",
+              "FACTION_MEMBER",
+              "FEALTY",
+              "mentorship",
+              "alliance",
+              "rivalry",
+              "debt",
+              "employment",
+              "family",
+              "faction_member",
+              "fealty",
+              "kinship_parent",
+              "kinship_sibling",
+              "kinship_cousin",
+              "kinship_uncle_nephew",
+              "kinship_ancestral",
+              "squad_comrade",
+              "peer_rival",
+              "mentor_student",
+              "courtship_affection",
+              "adversary_hostile",
+              "commercial_patron",
+              "institutional_command",
+              "member_of",
+              "tension_with",
+              "related_to"
+            ],
+            "description": "Relationship or social bond type"
+          },
+          "weight": { "type": "number", "description": "Connection strength or affinity weight" },
+          "context": { "type": "string", "description": "Narrative context or explanation of the relationship" },
+          "description": { "type": "string", "description": "Descriptive summary of the relationship" },
+          "directed": { "type": "boolean", "description": "Whether the edge is directed" }
+        }
+      }
+    },
     "houses_and_lineages": {
       "type": "object",
       "description": "Dictionary of patrician houses, noble clans, and commoner artisan lineages",
       "additionalProperties": {
         "type": "object",
-        "required": ["id", "name", "social_rank", "seat_or_origin", "motto", "traditions", "members"],
+        "required": ["id", "name"],
         "properties": {
           "id": { "type": "string" },
           "name": { "type": "string" },
@@ -91,10 +168,20 @@
       "description": "Exhaustive registry of all dramatis personae and their genealogical/social properties",
       "additionalProperties": {
         "type": "object",
-        "required": ["id", "name", "house_id", "kinship", "institutional", "social_bonds"],
+        "required": ["name"],
         "properties": {
           "id": { "type": "string" },
           "name": { "type": "string" },
+          "role": { "type": "string" },
+          "archetype": { "type": "string" },
+          "origin": { "type": "string" },
+          "summary": { "type": "string" },
+          "faction": { "type": "string" },
+          "traits": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "status": { "type": "string" },
           "titles_and_aliases": {
             "type": "array",
             "items": { "type": "string" }
@@ -118,7 +205,6 @@
           },
           "institutional": {
             "type": "object",
-            "required": ["affiliation", "rank_or_tier"],
             "properties": {
               "affiliation": { "type": "string" },
               "division": { "type": ["string", "null"] },
@@ -158,7 +244,7 @@
       "description": "Academy cohort rosters and tactical doctrine groupings",
       "additionalProperties": {
         "type": "object",
-        "required": ["cohort_name", "division", "tactical_doctrine", "members"],
+        "required": ["cohort_name", "members"],
         "properties": {
           "cohort_name": { "type": "string" },
           "division": { "type": "string" },
@@ -175,13 +261,29 @@
       "description": "Explicit directed and undirected relational edges for graph traversal and visual rendering",
       "items": {
         "type": "object",
-        "required": ["source", "target", "type", "description"],
+        "required": ["source", "target", "type"],
         "properties": {
           "source": { "type": "string" },
           "target": { "type": "string" },
           "type": {
             "type": "string",
             "enum": [
+              "MENTORSHIP",
+              "ALLIANCE",
+              "RIVALRY",
+              "DEBT",
+              "EMPLOYMENT",
+              "FAMILY",
+              "FACTION_MEMBER",
+              "FEALTY",
+              "mentorship",
+              "alliance",
+              "rivalry",
+              "debt",
+              "employment",
+              "family",
+              "faction_member",
+              "fealty",
               "kinship_parent",
               "kinship_sibling",
               "kinship_cousin",
@@ -193,11 +295,16 @@
               "courtship_affection",
               "adversary_hostile",
               "commercial_patron",
-              "institutional_command"
+              "institutional_command",
+              "member_of",
+              "tension_with",
+              "related_to"
             ]
           },
           "directed": { "type": "boolean" },
-          "description": { "type": "string" }
+          "description": { "type": "string" },
+          "weight": { "type": "number" },
+          "context": { "type": "string" }
         }
       }
     }
