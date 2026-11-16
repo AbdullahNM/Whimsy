@@ -678,6 +678,100 @@ class TestTransactionManager(unittest.TestCase):
         self.assertIn("state_drift", turn_content)
         self.assertIn("detected", turn_content)
 
+    def test_stage_mutations_preserves_staged_authoritative_state(self):
+        """
+        Asserts that when TransactionManager.stage("GAMEPLAY/status.json", authoritative_state)
+        is staged before stage_mutations_from_narrative, the staged authoritative state fields
+        (e.g., progression, clocks, flags, offered_choices) are preserved and not clobbered
+        by an un-updated disk reload.
+        """
+        authoritative_state = {
+            "schema_version": 2,
+            "campaign_id": "test_campaign",
+            "turn": 2,
+            "timeline": "Act I — Dawn of Chapter One",
+            "progression": {
+                "checkpoint_tokens": 4,
+                "checkpoint_max": 5,
+                "energy": 80,
+                "energy_max": 100,
+                "stress": 25,
+                "stress_max": 100,
+                "xp": 365,
+                "xp_threshold": 500
+            },
+            "purse": {
+                "credits": 600,
+                "display": "600 ₡"
+            },
+            "scene_anchor": {
+                "location": "Sub-Level 4",
+                "context": "Infiltration",
+                "time": "07:30 Local"
+            },
+            "public_state": {
+                "flags": {"vent_unlocked": True, "alarm_raised": False},
+                "conditions": ["stealth"],
+                "open_threads": ["Reach control terminal"]
+            },
+            "clocks": [
+                {
+                    "id": "deadline",
+                    "label": "Contract Deadline",
+                    "current": 2,
+                    "max": 4,
+                    "visibility": "known"
+                }
+            ],
+            "offered_choices": [
+                "1. Hack terminal silently",
+                "2. Cut primary power"
+            ]
+        }
+
+        tm = TransactionManager(self.campaign_dir)
+        # Stage authoritative state prior to narrative turn staging
+        tm.stage("GAMEPLAY/status.json", authoritative_state)
+
+        # Execute stage_mutations_from_narrative with GM output
+        gm_output = "Alex crawls through the unlocked vent into Sub-Level 4 without alerting guards."
+        staged = tm.stage_mutations_from_narrative(
+            campaign_dir=self.campaign_dir,
+            turn=2,
+            action="Crawl through vent",
+            gm_output=gm_output
+        )
+
+        canonical_key = tm.get_canonical_key("status.json")
+        self.assertIn(canonical_key, staged)
+        staged_status = staged[canonical_key]
+
+        # Verify authoritative fields were preserved and NOT reverted to disk state
+        self.assertEqual(staged_status["turn"], 2)
+        self.assertEqual(staged_status["progression"]["checkpoint_tokens"], 4)
+        self.assertEqual(staged_status["progression"]["energy"], 80)
+        self.assertEqual(staged_status["progression"]["stress"], 25)
+        self.assertEqual(staged_status["progression"]["xp"], 365)
+        self.assertEqual(staged_status["clocks"][0]["current"], 2)
+        self.assertEqual(staged_status["public_state"]["flags"]["vent_unlocked"], True)
+        self.assertEqual(staged_status["offered_choices"], [
+            "1. Hack terminal silently",
+            "2. Cut primary power"
+        ])
+        self.assertEqual(staged_status["scene_anchor"]["location"], "Sub-Level 4")
+
+        # Now commit and verify disk state matches the authoritative state
+        commit_res = tm.commit(self.campaign_dir)
+        self.assertTrue(commit_res["success"])
+        disk_status = self._read_json("GAMEPLAY/status.json")
+        self.assertEqual(disk_status["turn"], 2)
+        self.assertEqual(disk_status["clocks"][0]["current"], 2)
+        self.assertEqual(disk_status["public_state"]["flags"]["vent_unlocked"], True)
+        self.assertEqual(disk_status["offered_choices"], [
+            "1. Hack terminal silently",
+            "2. Cut primary power"
+        ])
+        self.assertEqual(disk_status["progression"]["xp"], 365)
 
 
 if __name__ == "__main__":

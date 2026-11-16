@@ -562,23 +562,27 @@ class TransactionManager:
         action_hash = hashlib.sha256(cleaned_action.encode("utf-8")).hexdigest()[:12]
         return f"{turn_number}_{action_hash}"
 
+    def get_canonical_key(self, file_key: str) -> str:
+        """
+        Resolves a file key or alias to its canonical relative repository path.
+        """
+        key_lower = file_key.strip().replace("\\", "/").lower()
+        if key_lower in FILE_KEY_MAPPING:
+            return FILE_KEY_MAPPING[key_lower]
+        elif key_lower in ("turn_file", "turn_md", "turn", "turn.md"):
+            if self.current_turn is not None:
+                return f"TURNS/ACTIVE/turn_{self.current_turn:04d}.md"
+            else:
+                return "turn_file"
+        else:
+            return os.path.normpath(file_key).replace("\\", "/")
+
     def stage(self, file_key: str, content: Any) -> str:
         """
         Stages an update for a canonical campaign file or turn markdown.
         Returns the resolved relative path.
         """
-        key_lower = file_key.strip().replace("\\", "/").lower()
-
-        if key_lower in FILE_KEY_MAPPING:
-            canonical = FILE_KEY_MAPPING[key_lower]
-        elif key_lower in ("turn_file", "turn_md", "turn", "turn.md"):
-            if self.current_turn is not None:
-                canonical = f"TURNS/ACTIVE/turn_{self.current_turn:04d}.md"
-            else:
-                canonical = "turn_file"
-        else:
-            canonical = os.path.normpath(file_key).replace("\\", "/")
-
+        canonical = self.get_canonical_key(file_key)
         self.staged_files[canonical] = content
         return canonical
 
@@ -610,8 +614,7 @@ class TransactionManager:
 
     def get_staged(self, file_key: str) -> Optional[Any]:
         """Returns currently staged content for a given file key."""
-        key_lower = file_key.strip().replace("\\", "/").lower()
-        canonical = FILE_KEY_MAPPING.get(key_lower, os.path.normpath(file_key).replace("\\", "/"))
+        canonical = self.get_canonical_key(file_key)
         return self.staged_files.get(canonical)
 
     def clear(self) -> None:
@@ -642,25 +645,85 @@ class TransactionManager:
         self.current_action = action
         self.current_transaction_id = self.generate_transaction_id(turn, action)
 
-        # 1. Read existing status.json
-        status_json_path = os.path.join(campaign_dir, "GAMEPLAY", "status.json")
-        status_json = {}
-        if os.path.exists(status_json_path):
-            with open(status_json_path, "r", encoding="utf-8") as f:
-                status_json = json.load(f)
+        # 1. Read existing status.json or retrieve staged authoritative status
+        status_canonical = self.get_canonical_key("status.json")
+        staged_status = self.staged_files.get(status_canonical)
+        if staged_status is None:
+            staged_status = self.staged_files.get("status.json")
 
-        # 2. Read existing status.md & items.md
-        status_md_path = os.path.join(campaign_dir, "GAMEPLAY", "status.md")
-        status_md = ""
-        if os.path.exists(status_md_path):
-            with open(status_md_path, "r", encoding="utf-8") as f:
-                status_md = f.read()
+        if staged_status is not None and isinstance(staged_status, dict):
+            status_json = copy.deepcopy(staged_status)
+        else:
+            status_json_path = os.path.join(campaign_dir, "GAMEPLAY", "status.json")
+            status_json = {}
+            if os.path.exists(status_json_path):
+                with open(status_json_path, "r", encoding="utf-8") as f:
+                    try:
+                        status_json = json.load(f)
+                    except Exception:
+                        status_json = {}
 
-        items_md_path = os.path.join(campaign_dir, "GAMEPLAY", "items.md")
-        items_md = ""
-        if os.path.exists(items_md_path):
-            with open(items_md_path, "r", encoding="utf-8") as f:
-                items_md = f.read()
+        # 2. Read existing status.md, items.md, and items.json or retrieve staged content
+        status_md_canonical = self.get_canonical_key("status.md")
+        staged_status_md = self.staged_files.get(status_md_canonical)
+        if staged_status_md is None:
+            staged_status_md = self.staged_files.get("status.md")
+
+        if staged_status_md is not None and isinstance(staged_status_md, str):
+            status_md = staged_status_md
+        else:
+            status_md_path = os.path.join(campaign_dir, "GAMEPLAY", "status.md")
+            status_md = ""
+            if os.path.exists(status_md_path):
+                with open(status_md_path, "r", encoding="utf-8") as f:
+                    status_md = f.read()
+
+        items_md_canonical = self.get_canonical_key("items.md")
+        staged_items_md = self.staged_files.get(items_md_canonical)
+        if staged_items_md is None:
+            staged_items_md = self.staged_files.get("items.md")
+
+        if staged_items_md is not None and isinstance(staged_items_md, str):
+            items_md = staged_items_md
+        else:
+            items_md_path = os.path.join(campaign_dir, "GAMEPLAY", "items.md")
+            items_md = ""
+            if os.path.exists(items_md_path):
+                with open(items_md_path, "r", encoding="utf-8") as f:
+                    items_md = f.read()
+
+        items_canonical = self.get_canonical_key("items.json")
+        staged_items = self.staged_files.get(items_canonical)
+        if staged_items is None:
+            staged_items = self.staged_files.get("items.json")
+
+        if staged_items is not None and isinstance(staged_items, dict):
+            items_json = copy.deepcopy(staged_items)
+        else:
+            items_json_path = os.path.join(campaign_dir, "GAMEPLAY", "items.json")
+            items_json = {}
+            if os.path.exists(items_json_path):
+                with open(items_json_path, "r", encoding="utf-8") as f:
+                    try:
+                        items_json = json.load(f)
+                    except Exception:
+                        items_json = {}
+
+        # Fallback: if outcome.next_state was provided in metadata and status was not pre-staged,
+        # merge next_state into status_json so authoritative fields are never lost
+        if metadata and isinstance(metadata, dict):
+            outcome_data = metadata.get("outcome")
+            next_state = None
+            if hasattr(outcome_data, "next_state") and isinstance(outcome_data.next_state, dict):
+                next_state = outcome_data.next_state
+            elif isinstance(outcome_data, dict) and isinstance(outcome_data.get("next_state"), dict):
+                next_state = outcome_data["next_state"]
+            elif isinstance(metadata.get("next_state"), dict):
+                next_state = metadata["next_state"]
+
+            if isinstance(next_state, dict) and (staged_status is None):
+                for k, v in next_state.items():
+                    status_json[k] = copy.deepcopy(v)
 
         # 3. Parse deltas via StateParser
         new_status_md, new_items_md, _ = StateParser.apply_state_mutations(gm_output, status_md, items_md)
@@ -675,6 +738,8 @@ class TransactionManager:
             self.stage("status.md", new_status_md)
         if items_md:
             self.stage("items.md", new_items_md)
+        if staged_items is not None:
+            self.stage("items.json", items_json)
 
         # 5. Stage turn log
         self.stage_turn(turn, action, gm_output, metadata)
