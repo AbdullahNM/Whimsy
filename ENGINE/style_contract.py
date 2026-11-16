@@ -50,23 +50,53 @@ class StyleContractValidator:
         r"\bdifferential\s+equations?\b",
         r"\bnavier-stokes\b",
         r"\bhamiltonian\b",
-        r"\bquantum\s+decoherence\b",
+        r"\bquantum\b",
         r"\bthermodynamic\s+efficiency\b",
         r"\bkinetic\s+vectors?\b",
-        r"\bdeceleration\s+multipliers?\b",
+        r"\b(?:acceleration|deceleration)\s+multipliers?\b",
         r"\b\d+\.\d+\s*(?:index|factor|multiplier)\b",
         r"\b(?:fifty|twenty|thirty|forty|sixty|seventy|eighty|ninety|\d+)\s+percent\s+harder\b",
+        r"\bexponents?\s+of\s+(?:talent|force|power|skill|ability)\b",
+        r"\bvector\s+calculus\b",
+        r"\btensor\s+fields?\b",
     ]
+
+    # Validated scene categories for context-aware gating
+    COMBAT_SCENE_TYPES = {"combat", "duel", "clash", "tactical"}
+    DOWNTIME_SCENE_TYPES = {"downtime", "transit", "mundane", "conversation", "routine", "exploration"}
+
+    # Tableware, cutlery, and furniture clustering
+    TABLEWARE_FURNITURE_PATTERN = (
+        r"(?:fork|spoon|knife|cup|mug|bowl|cutlery|table|chair|glass|goblet|"
+        r"dinner\s+plate|serving\s+plate|(?:(?<!breast)plate(?!\s+armou?r)))"
+    )
+    ENERGY_SPARK_VARIANTS = r"(?:sparks?|static|arcs?|flecks?\s+of\s+static|embers?|currents?)"
+    SPARK_ACTION_VERBS = r"(?:danced|dancing|crackled|flickered|leaped|jumped)"
+
+    # Combat physical friction indicators (weapons, armor, collision, friction)
+    COMBAT_FRICTION_PATTERN = (
+        r"\b(?:"
+        r"blade|sword|axe|spear|halberd|dagger|steel|iron|metal|anvil|"
+        r"armor|armour|shield|buckler|breastplate|gauntlet|helm|"
+        r"clash|clashed|clashing|struck|strike|striking|parr(?:y|ied|ying)|"
+        r"deflect(?:ed|ing|ion)?|glanc(?:ed|ing)|impact|friction|scrape|scraped|scraping|"
+        r"grated?|grating"
+        r")\b"
+    )
 
     # 2. Banned decorative micro-SFX in mundane scenes
     DECORATIVE_MICRO_SFX_PATTERNS = [
-        r"\bsparks?\s+(?:danced|dancing|crackled|flickered|leaped|jumped)\s+(?:on|across|from)\s+(?:the|your|his|her|their)\s+fork\b",
-        r"\bsparks?\s+(?:danced|dancing|crackled|flickered|leaped|jumped)\b",
+        # Tableware, cutlery, and furniture energy & spark variants
+        rf"\b{ENERGY_SPARK_VARIANTS}\s+(?:{SPARK_ACTION_VERBS}\s+)?(?:on|across|from|over|along|off)\s+(?:the|your|his|her|their|a|an)?\s*{TABLEWARE_FURNITURE_PATTERN}\b",
+        rf"\benergy\s+sparking\s+(?:off|from|across|on)\s+(?:the|your|his|her|their|a|an)?\s*{TABLEWARE_FURNITURE_PATTERN}\b",
+        rf"\b(?:the|your|his|her|their|a|an)?\s*{TABLEWARE_FURNITURE_PATTERN}\s+(?:sparked|crackled)\s+with\s+(?:power|energy|{ENERGY_SPARK_VARIANTS})\b",
+        # Generic sparking / energy actions
+        rf"\b{ENERGY_SPARK_VARIANTS}\s+{SPARK_ACTION_VERBS}\b",
+        # Environmental and character micro-SFX
         r"\b(?:the\s+)?(?:room|walls?|ground|floor)\s+(?:trembled|shook|quivered|vibrated)\b",
         r"\bair\s+(?:grew\s+heavy|grew\s+thick|crackled|hummed|thrummed|thickened)\s+with\s+(?:unspoken\s+power|power|energy|raw\s+power|mana|tension)\b",
         r"\b(?:knuckles?|fingers?|eyes?|hands?)\s+(?:glowed|flared|crackled)\s+with\s+(?:power|energy|light|sparks)\b",
         r"\b(?:fist|hand)\s+slammed\s+(?:the\s+table|down),\s*(?:shaking|trembling|splintering)\b",
-        r"\benergy\s+sparking\s+off\s+(?:the|your|his|her)\s+fork\b",
         r"\belemental\s+energy\s+sparking\b",
         r"\baura\s+(?:flared|flickered|pulsed)\s+(?:menacingly|dangerously|brightly)\b",
     ]
@@ -82,7 +112,13 @@ class StyleContractValidator:
         r"\bunbeknownst\s+to\s+(?:them|him|her|all|anyone)\b",
         r"\blittle\s+did\s+(?:they|he|she|anyone)\s+know\b",
         r"\ba\s+testament\s+to\s+(?:your|his|her|their)\s+(?:genius|prowess|might|greatness)\b",
-        r"\bwith\s+(?:flawless|peerless|superhuman|unmatched|effortless)\s+(?:grace|skill|speed|precision|mastery|brilliance)\b",
+        r"\b(?:with\s+)?(?:flawless|peerless|superhuman|unmatched|unrivaled|effortless)\s+(?:grace|skill|speed|precision|mastery|brilliance)\b",
+        r"\b(?:peerless|unrivaled|unmatched)\s+(?:genius|prodigy|intellect|talent)\b",
+        r"\b(?:display|performance|feat|skill|prowess)\s+was\s+(?:unmatched|unrivaled|peerless)\b",
+        r"\b(?:exhibition|showcase|display)\s+of\s+(?:brilliance|genius|mastery|greatness)\b",
+        r"\bmasterclass\s+in\b",
+        r"\bsuperhuman\s+feats?\b",
+        r"\bunrivaled\s+precision\b",
         r"\bin\s+an\s+awe-inspiring\s+display\b",
         r"\byour\s+sheer\s+brilliance\b",
         r"\blike\s+a\s+seasoned\s+master\b",
@@ -135,35 +171,111 @@ class StyleContractValidator:
         return cls()
 
     @classmethod
-    def validate(cls, text: str, config: Optional[dict] = None, outcome: Optional[Any] = None) -> Tuple[bool, List[str], float]:
-        """Convenience class method to validate prose with optional config and outcome."""
-        return cls(config).validate_prose(text, outcome=outcome)
+    def validate(
+        cls,
+        text: str,
+        config: Optional[dict] = None,
+        outcome: Optional[Any] = None,
+        scene_type: Optional[str] = None
+    ) -> Tuple[bool, List[str], float]:
+        """Convenience class method to validate prose with optional config, outcome, and scene_type."""
+        return cls(config).validate_prose(text, outcome=outcome, scene_type=scene_type)
+
+    @classmethod
+    def resolve_scene_type(
+        cls,
+        scene_type: Optional[str] = None,
+        outcome: Optional[Any] = None,
+        config: Optional[dict] = None
+    ) -> Optional[str]:
+        """
+        Determines the scene_type from explicit argument, outcome state/metadata, or config.
+        """
+        if scene_type:
+            return str(scene_type).lower().strip()
+
+        if outcome is not None:
+            # Check next_state -> pacing_state -> scene_type
+            next_state = getattr(outcome, "next_state", None)
+            if next_state is None and isinstance(outcome, dict):
+                next_state = outcome.get("next_state")
+            if isinstance(next_state, dict):
+                pacing_state = next_state.get("pacing_state")
+                if isinstance(pacing_state, dict):
+                    st = pacing_state.get("scene_type")
+                    if st:
+                        return str(st).lower().strip()
+
+            # Check metadata -> scene_type
+            metadata = getattr(outcome, "metadata", None)
+            if metadata is None and isinstance(outcome, dict):
+                metadata = outcome.get("metadata")
+            if isinstance(metadata, dict):
+                st = metadata.get("scene_type")
+                if st:
+                    return str(st).lower().strip()
+
+        if config and isinstance(config, dict):
+            st = config.get("scene_type")
+            if st:
+                return str(st).lower().strip()
+
+        return None
 
     def validate_prose(
         self,
         text: Any = None,
         config: Optional[dict] = None,
-        outcome: Optional[Any] = None
+        outcome: Optional[Any] = None,
+        scene_type: Optional[str] = None,
+        **kwargs: Any
     ) -> Tuple[bool, List[str], float]:
         """
         Validates prose text. Can be called either as an instance method:
-            validator.validate_prose(text, config=None, outcome=None)
+            validator.validate_prose(text, config=None, outcome=None, scene_type=None)
         or directly as:
-            StyleContractValidator.validate_prose(text, config=None, outcome=None)
+            StyleContractValidator.validate_prose(text, config=None, outcome=None, scene_type=None)
         Returns (is_compliant: bool, violations: list[str], score: float).
         """
         if not isinstance(self, StyleContractValidator):
-            # Called directly on class without instantiation: StyleContractValidator.validate_prose(text, config, outcome)
+            # Called directly on class without instantiation:
+            # StyleContractValidator.validate_prose(text, config, outcome, scene_type)
             actual_text = self
             actual_config = text if isinstance(text, dict) else config
+            actual_outcome = outcome
+            actual_scene_type = scene_type
+            if actual_outcome is None and hasattr(config, "next_state"):
+                actual_outcome = config
+                actual_config = None
             validator = StyleContractValidator(actual_config)
-            return validator.validate_prose(actual_text, outcome=outcome)
+            return validator.validate_prose(
+                actual_text,
+                outcome=actual_outcome,
+                scene_type=actual_scene_type,
+                **kwargs
+            )
+
+        # Instance call
+        if outcome is None and hasattr(config, "next_state"):
+            outcome = config
+            config = None
 
         effective_config = dict(self.config)
         if isinstance(config, dict):
             effective_config.update(config)
 
-        return self._run_validation(str(text or ""), effective_config, outcome=outcome)
+        resolved_scene_type = self.resolve_scene_type(
+            scene_type=scene_type,
+            outcome=outcome,
+            config=effective_config
+        )
+
+        return self._run_validation(
+            str(text or ""),
+            effective_config,
+            outcome=outcome,
+            scene_type=resolved_scene_type
+        )
 
     def _extract_prose_sentences(self, text: str) -> List[str]:
         """
@@ -205,8 +317,8 @@ class StyleContractValidator:
         return sentences
 
     @staticmethod
-    def _find_non_overlapping_matches(patterns: List[str], text: str) -> List[str]:
-        """Find matches from patterns, preferring longer and non-overlapping matches."""
+    def _find_matches_with_spans(patterns: List[str], text: str) -> List[Tuple[int, int, str]]:
+        """Find non-overlapping matches from patterns with their start and end spans."""
         all_matches = []
         for pat in patterns:
             for m in re.finditer(pat, text, re.IGNORECASE):
@@ -219,11 +331,66 @@ class StyleContractValidator:
         last_end = -1
         for start, end, match_str in all_matches:
             if start >= last_end:
-                selected.append(match_str)
+                selected.append((start, end, match_str))
                 last_end = end
         return selected
 
-    def _run_validation(self, text: str, config: dict, outcome: Optional[Any] = None) -> Tuple[bool, List[str], float]:
+    @classmethod
+    def _find_non_overlapping_matches(cls, patterns: List[str], text: str) -> List[str]:
+        """Find matches from patterns, preferring longer and non-overlapping matches."""
+        return [m[2] for m in cls._find_matches_with_spans(patterns, text)]
+
+    @staticmethod
+    def _get_surrounding_sentence(text: str, start: int, end: int) -> str:
+        """Extract the sentence or line surrounding character span [start, end]."""
+        before = text[:start]
+        m_before = list(re.finditer(r"[.!?\n]", before))
+        sent_start = m_before[-1].end() if m_before else 0
+
+        after = text[end:]
+        m_after = re.search(r"[.!?\n]", after)
+        sent_end = end + m_after.start() + 1 if m_after else len(text)
+
+        return text[sent_start:sent_end].strip()
+
+    def _is_legitimate_combat_spark(self, match_str: str, surrounding_sentence: str) -> bool:
+        """
+        Returns True if the spark match is a legitimate physical friction spark in combat
+        (e.g., blade clashing on armor), while strictly excluding mundane micro-SFX
+        (cutlery, tableware, furniture, or non-friction effects).
+        """
+        # 1. Non-spark matches (e.g. room trembling, glowing knuckles, air heavy, aura) are never combat sparks
+        spark_energy_check = re.search(
+            r"\b(?:sparks?|static|arcs?|flecks?\s+of\s+static|embers?|currents?)\b",
+            match_str,
+            re.IGNORECASE
+        )
+        if not spark_energy_check:
+            return False
+
+        # 2. If the match string itself mentions tableware/furniture, it's mundane micro-SFX
+        if re.search(rf"\b{self.TABLEWARE_FURNITURE_PATTERN}\b", match_str, re.IGNORECASE):
+            return False
+
+        # 3. If the surrounding sentence mentions tableware/cutlery/furniture/food, it is mundane micro-SFX
+        if re.search(rf"\b{self.TABLEWARE_FURNITURE_PATTERN}\b", surrounding_sentence, re.IGNORECASE):
+            return False
+        if re.search(r"\b(?:food|meal|breakfast|lunch|dinner|soup|bread|tea|ale|wine|feast)\b", surrounding_sentence, re.IGNORECASE):
+            return False
+
+        # 4. Check for legitimate combat physical friction indicators (weapons, armor, collision, friction)
+        if re.search(self.COMBAT_FRICTION_PATTERN, surrounding_sentence, re.IGNORECASE):
+            return True
+
+        return False
+
+    def _run_validation(
+        self,
+        text: str,
+        config: dict,
+        outcome: Optional[Any] = None,
+        scene_type: Optional[str] = None
+    ) -> Tuple[bool, List[str], float]:
         violations: List[str] = []
 
         # 1. STEM / Calculus / Physics jargon check
@@ -234,8 +401,13 @@ class StyleContractValidator:
 
         # 2. Decorative micro-SFX check
         if config.get("ban_decorative_microsfx", True):
-            matches = self._find_non_overlapping_matches(self.DECORATIVE_MICRO_SFX_PATTERNS, text)
-            for m in matches:
+            is_combat = bool(scene_type and scene_type in self.COMBAT_SCENE_TYPES)
+            match_spans = self._find_matches_with_spans(self.DECORATIVE_MICRO_SFX_PATTERNS, text)
+            for start, end, m in match_spans:
+                if is_combat:
+                    surrounding_sent = self._get_surrounding_sentence(text, start, end)
+                    if self._is_legitimate_combat_spark(m, surrounding_sent):
+                        continue
                 violations.append(f"Decorative micro-SFX detected: '{m}'")
 
         # 3. Narrator praise / editorializing check
