@@ -1,0 +1,23 @@
+services:
+  engine:
+    build: .
+    container_name: whimsy-engine
+    command: ["engine"]
+    ports:
+      - "8000:8000"
+    environment:
+      - ANTIGRAVITY_PORT=8000
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./CAMPAIGNS:/app/CAMPAIGNS
+    restart: unless-stopped
+
+  ui:
+    build: .
+    container_name: whimsy-ui
+    command: ["ui"]
+    ports:
+      - "3000:3000"
+    depends_on:
+      - engine
+    restart: unless-stopped
