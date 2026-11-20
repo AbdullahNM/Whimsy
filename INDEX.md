@@ -64,6 +64,7 @@ Whimsy/
 │   ├── styles.css                          # High-contrast accessible theme and responsive rules
 │   └── gameplay_manifest.json              # Bundled fallback data for offline template sandbox
 │
+├── QUICKSTART.md                           # Step-by-step setup (Docker Compose, Native, Dist)
 └── INDEX.md                                # This navigation index
 ```
 

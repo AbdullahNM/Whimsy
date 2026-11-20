@@ -103,28 +103,47 @@ The Whimsy evolution architecture coordinates five modular subsystems into a sin
 
 ## Getting started
 
+For in-depth step-by-step instructions, environment variables, troubleshooting, and offline standalone builds, see the **[Quickstart Guide](QUICKSTART.md)**.
+
+### Option 1: Docker Compose (Recommended)
+
+Run both the Engine server and the UI PWA in isolated containers with live campaign volume mounting defined in `docker-compose.yml`:
+
+```bash
+docker compose up --build
+```
+
+- **Frontend PWA:** [http://localhost:3000](http://localhost:3000)
+- **Engine Server:** [http://localhost:8000](http://localhost:8000) (Diagnostics: `/health`)
+- Campaign progress and turn state automatically persist to `./CAMPAIGNS`.
+
+### Option 2: Native Local Execution
+
 Requirements: **Python 3.10+** and **Node.js 18+** (Node is only needed for the JS test suite).
 
-### Run the engine server
+1. Install dependencies from `requirements.txt`:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-```bash
-python3 ENGINE/engine.py
-# listens on http://localhost:8000 (override with ANTIGRAVITY_PORT)
-```
+2. Run the engine server:
+   ```bash
+   python3 ENGINE/engine.py
+   # listens on http://localhost:8000 (override with ANTIGRAVITY_PORT)
+   ```
 
-Endpoints:
+   Endpoints:
 
-| Method | Path       | Purpose                                              |
-|--------|------------|------------------------------------------------------|
-| `GET`  | `/health`  | Status + active diagnostics (mode, zoom, elapsed time, features) |
-| `POST` | `/generate`| Orchestrated 7-step turn generation pipeline         |
+   | Method | Path       | Purpose                                              |
+   |--------|------------|------------------------------------------------------|
+   | `GET`  | `/health`  | Status + active diagnostics (mode, zoom, elapsed time, features) |
+   | `POST` | `/generate`| Orchestrated 7-step turn generation pipeline         |
 
-### Run the PWA
-
-```bash
-python3 -m http.server 3000 --directory UI
-# open http://localhost:3000
-```
+3. Run the PWA:
+   ```bash
+   python3 -m http.server 3000 --directory UI
+   # open http://localhost:3000
+   ```
 
 ### Run the tests
 
@@ -150,6 +169,7 @@ See `GLOBAL/CAMPAIGN_INIT_SPEC.md` for the full contract.
 
 ## Documentation
 
+- `QUICKSTART.md` — comprehensive step-by-step setup guide (Docker Compose, native Python, and dist builds)
 - `INDEX.md` — architecture and directory reference
 - `GLOBAL/` — the authoritative rules every turn must follow
 - `openspec/specs/` — formal specs for the persistence contract, campaign schema, UI renderer, and local engine
