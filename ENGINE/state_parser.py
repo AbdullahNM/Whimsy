@@ -115,15 +115,27 @@ class StateParser:
             modified = True
 
         sys_data = cls.parse_system_block(text)
-        if sys_data and "strain" in sys_data:
-            new_strain = sys_data["strain"]
-            new_status = re.sub(
-                r'(\bStrain(?:\s*Buffer)?\*{0,2}:\s*)[0-9\/\s]+',
-                rf'\g<1>{new_strain}',
-                new_status,
-                flags=re.IGNORECASE
-            )
-            modified = True
+        if sys_data:
+            if "turn" in sys_data:
+                new_turn = int(sys_data["turn"])
+                updated_turn_md = re.sub(
+                    r'(\bTurn\*{0,2}:\*{0,2}\s*)\d+',
+                    rf'\g<1>{new_turn}',
+                    new_status,
+                    flags=re.IGNORECASE
+                )
+                if updated_turn_md != new_status:
+                    new_status = updated_turn_md
+                    modified = True
+            if "strain" in sys_data:
+                new_strain = sys_data["strain"]
+                new_status = re.sub(
+                    r'(\bStrain(?:\s*Buffer)?\*{0,2}:\s*)[0-9\/\s]+',
+                    rf'\g<1>{new_strain}',
+                    new_status,
+                    flags=re.IGNORECASE
+                )
+                modified = True
 
         return new_status, new_items, modified
 

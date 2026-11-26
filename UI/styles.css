@@ -88,8 +88,10 @@ body {
 /* Top Bar */
 #top-bar {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
+  gap: 8px 12px;
   background-color: var(--bg-slate);
   padding: 8px 16px;
   border-bottom: 1px solid var(--border-color);
@@ -98,8 +100,11 @@ body {
 
 .header-left, .header-right, .header-controls {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 8px 10px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .campaign-title {
@@ -1235,6 +1240,48 @@ body {
 /* RESPONSIVE BREAKPOINTS (Mobile & Tablet Tunnel Support)                     */
 /* ========================================================================== */
 
+@media (max-width: 1024px) {
+  #top-bar {
+    padding: 7px 12px;
+  }
+
+  .header-right {
+    order: 3;
+    flex-basis: 100%;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .header-controls {
+    order: 2;
+    margin-left: auto;
+  }
+
+  .sidebar {
+    width: 280px;
+    min-width: 240px;
+  }
+
+  #story-stream {
+    padding: 16px 18px;
+    gap: 14px;
+    min-height: 0;
+  }
+
+  .quickstart-strip {
+    padding: 7px 12px;
+    gap: 8px;
+    font-size: 12px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+  }
+
+  .quickstart-strip-text {
+    flex: 1 1 240px;
+    line-height: 1.35;
+  }
+}
+
 @media (max-width: 768px) {
   #top-bar {
     padding: 6px 10px;
@@ -1918,6 +1965,48 @@ body {
   flex-wrap: wrap;
   gap: 12px;
   margin-top: 8px;
+}
+
+@media (max-width: 1024px) {
+  #top-bar {
+    padding: 7px 12px;
+  }
+
+  .header-right {
+    order: 3;
+    flex-basis: 100%;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .header-controls {
+    order: 2;
+    margin-left: auto;
+  }
+
+  .sidebar {
+    width: 280px;
+    min-width: 240px;
+  }
+
+  #story-stream {
+    padding: 16px 18px;
+    gap: 14px;
+    min-height: 0;
+  }
+
+  .quickstart-strip {
+    padding: 7px 12px;
+    gap: 8px;
+    font-size: 12px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+  }
+
+  .quickstart-strip-text {
+    flex: 1 1 240px;
+    line-height: 1.35;
+  }
 }
 
 @media (max-width: 768px) {

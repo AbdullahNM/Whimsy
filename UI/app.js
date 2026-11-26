@@ -1587,6 +1587,9 @@ if (campaignSelect) {
 }
 
 // Sidebar Controls: Toggle & Expand
+if (typeof window !== 'undefined' && typeof window.innerWidth === 'number' && window.innerWidth <= 768) {
+  sidebar?.classList?.add('collapsed');
+}
 toggleSidebarBtn.addEventListener('click', () => {
   sidebar.classList.toggle('collapsed');
 });
