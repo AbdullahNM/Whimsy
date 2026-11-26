@@ -59,13 +59,28 @@ class TestPackaging(unittest.TestCase):
         self.assertIn("http.server 3000", content)
 
     def test_dockerignore(self):
-        """Validates .dockerignore ignores development and cache artifacts."""
+        """Validates .dockerignore ignores development, cache, and private campaign directories."""
         content = self.dockerignore_path.read_text(encoding="utf-8")
         lines = [line.strip() for line in content.splitlines() if line.strip() and not line.startswith("#")]
 
         self.assertIn(".git", lines)
         self.assertIn("__pycache__", lines)
         self.assertIn(".worktrees", lines)
+        self.assertIn("CAMPAIGNS/*", lines)
+        self.assertIn("!CAMPAIGNS/template_campaign/", lines)
+        self.assertIn("!CAMPAIGNS/sample_campaign/", lines)
+
+    def test_build_dist_resolves_paths_before_reading(self):
+        """Validates build_self_contained_html rejects traversal paths before reading files."""
+        import tempfile
+        from scripts.build_dist import build_self_contained_html, CampaignSafetyError
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            outside = Path(tmpdir) / "secret_dir"
+            outside.mkdir()
+            (outside / "campaign_config.json").write_text('{"id": "secret_dir"}', encoding="utf-8")
+            with self.assertRaises(CampaignSafetyError):
+                build_self_contained_html("../secret_dir", repo_root=tmpdir)
 
     def test_docker_compose_spec(self):
         """Validates docker-compose.yml structure, services, ports, and commands."""

@@ -411,59 +411,59 @@ class TestEngineServer(unittest.TestCase):
                 status_priv, _, _ = execute_request("GET", "/api/campaign?campaign=private_diary")
                 self.assertEqual(status_priv, 403)
 
-            # commit:false must not return cached retry=True even after commit:true recorded same turn+action
-            priv_dir = os.path.join(tmpdir, "CAMPAIGNS", "private_diary")
-            status_c1, _, body_c1 = execute_request(
-                "POST",
-                "/generate",
-                body=json.dumps({
-                    "action": "1",
-                    "campaign": "private_diary",
-                    "campaign_dir": priv_dir,
-                    "root_dir": tmpdir,
-                    "currentTurn": 1,
-                    "commit": True,
-                }).encode("utf-8"),
-                headers={"Content-Type": "application/json"}
-            )
-            self.assertEqual(status_c1, 200, body_c1.decode("utf-8"))
-            self.assertTrue(json.loads(body_c1.decode("utf-8")).get("committed"))
+                # commit:false must not return cached retry=True even after commit:true recorded same turn+action
+                priv_dir = os.path.join(tmpdir, "CAMPAIGNS", "private_diary")
+                status_c1, _, body_c1 = execute_request(
+                    "POST",
+                    "/generate",
+                    body=json.dumps({
+                        "action": "1",
+                        "campaign": "private_diary",
+                        "campaign_dir": priv_dir,
+                        "root_dir": tmpdir,
+                        "currentTurn": 1,
+                        "commit": True,
+                    }).encode("utf-8"),
+                    headers={"Content-Type": "application/json"}
+                )
+                self.assertEqual(status_c1, 200, body_c1.decode("utf-8"))
+                self.assertTrue(json.loads(body_c1.decode("utf-8")).get("committed"))
 
-            status_preview, _, body_preview = execute_request(
-                "POST",
-                "/generate",
-                body=json.dumps({
-                    "action": "1",
-                    "campaign": "private_diary",
-                    "campaign_dir": priv_dir,
-                    "root_dir": tmpdir,
-                    "currentTurn": 1,
-                    "commit": False,
-                }).encode("utf-8"),
-                headers={"Content-Type": "application/json"}
-            )
-            self.assertEqual(status_preview, 200, body_preview.decode("utf-8"))
-            preview_data = json.loads(body_preview.decode("utf-8"))
-            self.assertFalse(preview_data.get("committed"))
-            self.assertNotIn("retry", preview_data)
+                status_preview, _, body_preview = execute_request(
+                    "POST",
+                    "/generate",
+                    body=json.dumps({
+                        "action": "1",
+                        "campaign": "private_diary",
+                        "campaign_dir": priv_dir,
+                        "root_dir": tmpdir,
+                        "currentTurn": 1,
+                        "commit": False,
+                    }).encode("utf-8"),
+                    headers={"Content-Type": "application/json"}
+                )
+                self.assertEqual(status_preview, 200, body_preview.decode("utf-8"))
+                preview_data = json.loads(body_preview.decode("utf-8"))
+                self.assertFalse(preview_data.get("committed"))
+                self.assertNotIn("retry", preview_data)
 
-            # Second commit:true call DOES replay committed record idempotently
-            status_replay, _, body_replay = execute_request(
-                "POST",
-                "/generate",
-                body=json.dumps({
-                    "action": "1",
-                    "campaign": "private_diary",
-                    "campaign_dir": priv_dir,
-                    "root_dir": tmpdir,
-                    "currentTurn": 1,
-                    "commit": True,
-                }).encode("utf-8"),
-                headers={"Content-Type": "application/json"}
-            )
-            self.assertEqual(status_replay, 200, body_replay.decode("utf-8"))
-            replay_data = json.loads(body_replay.decode("utf-8"))
-            self.assertTrue(replay_data.get("retry"))
+                # Second commit:true call DOES replay committed record idempotently
+                status_replay, _, body_replay = execute_request(
+                    "POST",
+                    "/generate",
+                    body=json.dumps({
+                        "action": "1",
+                        "campaign": "private_diary",
+                        "campaign_dir": priv_dir,
+                        "root_dir": tmpdir,
+                        "currentTurn": 1,
+                        "commit": True,
+                    }).encode("utf-8"),
+                    headers={"Content-Type": "application/json"}
+                )
+                self.assertEqual(status_replay, 200, body_replay.decode("utf-8"))
+                replay_data = json.loads(body_replay.decode("utf-8"))
+                self.assertTrue(replay_data.get("retry"))
 
     def test_nontemplate_turn5_stat_change_and_distinctive_next_choice(self):
         import tempfile
@@ -540,6 +540,85 @@ class TestEngineServer(unittest.TestCase):
             self.assertIn("Unseal the brine-stained harbor ledger", data["response"])
             self.assertIn("Energy: 70 / 100", data["response"])
             self.assertIn("Turn 6", data["response"])
+
+    def test_origin_auth_and_filesystem_path_containment(self):
+        import tempfile
+
+        # 1) Untrusted Origin rejected with 403 and no Access-Control-Allow-Origin header
+        for method, path, body in [
+            ("OPTIONS", "/api/campaigns", b""),
+            ("GET", "/api/campaigns", b""),
+            ("POST", "/generate", json.dumps({"action": "1", "campaign": "template_campaign"}).encode("utf-8")),
+        ]:
+            status, headers, _ = execute_request(
+                method,
+                path,
+                body=body,
+                headers={"Origin": "https://evil.example", "Content-Type": "application/json"},
+            )
+            self.assertEqual(status, 403)
+            self.assertIsNone(headers.get("access-control-allow-origin"))
+
+        # Allowed loopback Origin is echoed with Vary: Origin
+        status_ok, headers_ok, _ = execute_request(
+            "GET",
+            "/api/campaigns",
+            headers={"Origin": "http://localhost:3000"},
+        )
+        self.assertEqual(status_ok, 200)
+        self.assertEqual(headers_ok.get("access-control-allow-origin"), "http://localhost:3000")
+
+        # 2) Optional WHIMSY_AUTH_TOKEN protects campaign/engine routes while keeping /health open
+        with patch.dict(os.environ, {"WHIMSY_AUTH_TOKEN": "top-secret-token"}):
+            st_health, _, _ = execute_request("GET", "/health")
+            self.assertEqual(st_health, 200)
+
+            st_unauth, _, _ = execute_request("GET", "/api/campaigns")
+            self.assertEqual(st_unauth, 401)
+
+            st_auth, _, _ = execute_request(
+                "GET",
+                "/api/campaigns",
+                headers={"Authorization": "Bearer top-secret-token"},
+            )
+            self.assertEqual(st_auth, 200)
+
+        # 3) Arbitrary filesystem paths outside configured roots are rejected
+        with tempfile.TemporaryDirectory() as outside_dir:
+            st_bad_root, _, body_bad_root = execute_request(
+                "POST",
+                "/generate",
+                body=json.dumps({
+                    "action": "1",
+                    "campaign": "template_campaign",
+                    "root_dir": outside_dir,
+                }).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+            )
+            self.assertEqual(st_bad_root, 400)
+            self.assertEqual(json.loads(body_bad_root.decode("utf-8")).get("error"), "INVALID_PATH")
+
+            st_bad_cdir, _, body_bad_cdir = execute_request(
+                "POST",
+                "/generate",
+                body=json.dumps({
+                    "action": "1",
+                    "campaign": "outside",
+                    "campaign_dir": os.path.join(outside_dir, "CAMPAIGNS", "outside"),
+                }).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+            )
+            self.assertEqual(st_bad_cdir, 400)
+            self.assertEqual(json.loads(body_bad_cdir.decode("utf-8")).get("error"), "INVALID_PATH")
+
+        # 4) Traversal and private campaign HTTP routes blocked
+        st_trav, _, _ = execute_request("GET", "/api/channel?campaign=../../etc")
+        self.assertEqual(st_trav, 400)
+        with patch.dict(os.environ, {"WHIMSY_ALLOW_PRIVATE_CAMPAIGN_API": ""}):
+            st_priv_tel, _, _ = execute_request("GET", "/api/telemetry?campaign=private_camp")
+            self.assertEqual(st_priv_tel, 403)
+            st_priv_chan, _, _ = execute_request("GET", "/api/channel?campaign=private_camp")
+            self.assertEqual(st_priv_chan, 403)
 
     def test_generate_post_deterministic_remediation_strips_formulaic_closings(self):
         """Verify that formulaic turn closings are deterministically stripped and validated."""
@@ -674,7 +753,7 @@ class TestEngineServer(unittest.TestCase):
                 "max_style_retries": 2
             }
 
-            with patch.object(EngineRequestHandler, "_call_model", return_value=violating_prose) as mock_model:
+            with patch("ENGINE.engine.ROOT_DIR", temp_workspace), patch.object(EngineRequestHandler, "_call_model", return_value=violating_prose) as mock_model:
                 status, headers, resp_body = execute_request(
                     "POST",
                     "/generate",
