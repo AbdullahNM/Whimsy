@@ -82,6 +82,37 @@ class TestPackaging(unittest.TestCase):
             with self.assertRaises(CampaignSafetyError):
                 build_self_contained_html("../secret_dir", repo_root=tmpdir)
 
+    def test_build_dist_escapes_inline_json_and_title(self):
+        """Validates build_self_contained_html neutralizes case-insensitive </SCRIPT> and HTML in title."""
+        import shutil
+        import tempfile
+        from scripts.build_dist import build_self_contained_html
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Copy UI and template_campaign structure, injecting adversarial title & JSON string
+            shutil.copytree(self.repo_root / "UI", Path(tmpdir) / "UI")
+            camp_dir = Path(tmpdir) / "CAMPAIGNS" / "xss_camp"
+            shutil.copytree(self.repo_root / "CAMPAIGNS" / "template_campaign", camp_dir)
+
+            cfg_path = camp_dir / "campaign_config.json"
+            cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+            cfg["id"] = "xss_camp"
+            cfg["title"] = 'Chronicle </title><script>alert(1)</script>'
+            import json as _json
+            cfg_path.write_text(_json.dumps(cfg), encoding="utf-8")
+
+            st_path = camp_dir / "GAMEPLAY" / "status.json"
+            st = _json.loads(st_path.read_text(encoding="utf-8"))
+            st["scene_anchor"]["context"] = '</SCRIPT><!--<script>alert("xss")</script>'
+            st_path.write_text(_json.dumps(st), encoding="utf-8")
+
+            html_out, _, _, _ = build_self_contained_html("xss_camp", repo_root=tmpdir)
+            self.assertNotIn("</SCRIPT>", html_out)
+            self.assertNotIn("<!--<script>", html_out)
+            self.assertNotIn("<title>Chronicle </title><script>", html_out)
+            self.assertIn("&lt;/title&gt;&lt;script&gt;alert(1)&lt;/script&gt;", html_out)
+            self.assertIn("\\u003c/SCRIPT\\u003e", html_out)
+
     def test_docker_compose_spec(self):
         """Validates docker-compose.yml structure, services, ports, and commands."""
         with open(self.compose_path, "r", encoding="utf-8") as f:
@@ -98,7 +129,7 @@ class TestPackaging(unittest.TestCase):
         self.assertEqual(engine.get("container_name"), "whimsy-engine")
         self.assertEqual(engine.get("command"), ["engine"])
         self.assertEqual(engine.get("restart"), "unless-stopped")
-        self.assertIn("8000:8000", engine.get("ports", []))
+        self.assertIn("127.0.0.1:8000:8000", engine.get("ports", []))
         self.assertIn("./CAMPAIGNS:/app/CAMPAIGNS", engine.get("volumes", []))
 
         # Check engine environment
@@ -119,7 +150,7 @@ class TestPackaging(unittest.TestCase):
         self.assertEqual(ui.get("container_name"), "whimsy-ui")
         self.assertEqual(ui.get("command"), ["ui"])
         self.assertEqual(ui.get("restart"), "unless-stopped")
-        self.assertIn("3000:3000", ui.get("ports", []))
+        self.assertIn("127.0.0.1:3000:3000", ui.get("ports", []))
 
         depends_on = ui.get("depends_on")
         if isinstance(depends_on, list):

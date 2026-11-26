@@ -680,10 +680,11 @@ function applyActiveCampaignConfig() {
   if (topMetricsContainer && activeConfig.metrics) {
     topMetricsContainer.innerHTML = '';
     activeConfig.metrics.forEach(m => {
+      const safeId = escapeHtml(String(m.id || '').replace(/[^a-zA-Z0-9_-]/g, ''));
       const pill = document.createElement('span');
       pill.className = 'metric-pill';
-      pill.id = `metric-pill-${m.id}`;
-      pill.innerHTML = `${m.label}: <strong id="val-${m.id}">—</strong>`;
+      pill.id = `metric-pill-${safeId}`;
+      pill.innerHTML = `${escapeHtml(String(m.label ?? ''))}: <strong id="val-${safeId}">—</strong>`;
       topMetricsContainer.appendChild(pill);
     });
   }
@@ -846,14 +847,16 @@ function renderSchemaDrivenStatus(statusJson, config, markdownFallback = '') {
       const val = getNestedValue(statusJson, bar.path) ?? 0;
       const maxVal = bar.max_path ? (getNestedValue(statusJson, bar.max_path) ?? 100) : 100;
       const pct = Math.max(0, Math.min(100, Math.round((val / maxVal) * 100)));
+      const rawColor = String(bar.color || '').trim();
+      const safeBarColor = /^(?:#[0-9a-fA-F]{3,8}|var\(--[a-zA-Z0-9-]+\)|[a-zA-Z]+)$/.test(rawColor) ? rawColor : 'var(--gold-primary)';
       html += `
         <div class="stat-bar-group">
           <div class="stat-bar-label">
-            <span>${escapeHtml(bar.label)}</span>
-            <span><strong>${val}</strong> / ${maxVal} ${bar.unit || ''}</span>
+            <span>${escapeHtml(String(bar.label || ''))}</span>
+            <span><strong>${escapeHtml(String(val))}</strong> / ${escapeHtml(String(maxVal))} ${escapeHtml(String(bar.unit || ''))}</span>
           </div>
           <div class="progress-bar">
-            <div class="progress-fill" style="width: ${pct}%; background-color: ${bar.color || 'var(--gold-primary)'};"></div>
+            <div class="progress-fill" style="width: ${pct}%; background-color: ${safeBarColor};"></div>
           </div>
         </div>
       `;
@@ -874,8 +877,8 @@ function renderSchemaDrivenStatus(statusJson, config, markdownFallback = '') {
       if (val !== undefined && val !== null) {
         html += `
           <div class="stat-box">
-            <span class="lbl">${escapeHtml(box.label)}</span>
-            <span class="val">${escapeHtml(String(val))} ${box.suffix || ''}</span>
+            <span class="lbl">${escapeHtml(String(box.label || ''))}</span>
+            <span class="val">${escapeHtml(String(val))} ${escapeHtml(String(box.suffix || ''))}</span>
           </div>
         `;
       }
@@ -896,7 +899,7 @@ function renderSchemaDrivenStatus(statusJson, config, markdownFallback = '') {
       `;
       for (const [k, v] of Object.entries(dict)) {
         const formattedKey = k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-        html += `<li><span>${escapeHtml(formattedKey)}:</span> <strong>${v}/${maxScale}</strong></li>`;
+        html += `<li><span>${escapeHtml(formattedKey)}:</span> <strong>${escapeHtml(String(v))}/${escapeHtml(String(maxScale))}</strong></li>`;
       }
       html += `</ul></div></div>`;
     }

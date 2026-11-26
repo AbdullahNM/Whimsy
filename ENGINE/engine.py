@@ -445,10 +445,11 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
             return False
 
         configured_token = (os.environ.get("WHIMSY_AUTH_TOKEN") or "").strip()
-        if configured_token and not allow_public:
+        require_auth = os.environ.get("WHIMSY_REQUIRE_AUTH") == "1" or bool(configured_token)
+        if require_auth and not allow_public:
             auth_header = (headers.get("Authorization") or "") if headers else ""
             supplied = auth_header[7:].strip() if auth_header.lower().startswith("bearer ") else ""
-            if not supplied or not hmac.compare_digest(supplied, configured_token):
+            if not configured_token or not supplied or not hmac.compare_digest(supplied, configured_token):
                 self._set_cors_headers(401)
                 self.wfile.write(json.dumps({"error": "Missing or invalid authorization token."}).encode("utf-8"))
                 return False
@@ -1492,9 +1493,22 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
 
 
 def main():
-    server = HTTPServer((DEFAULT_BIND_HOST, PORT), EngineRequestHandler)
+    bind_host = (os.environ.get("WHIMSY_HOST") or DEFAULT_BIND_HOST).strip()
+    is_loopback = bind_host in ("127.0.0.1", "localhost", "::1")
+    has_token = bool((os.environ.get("WHIMSY_AUTH_TOKEN") or "").strip())
+    if (
+        not is_loopback
+        and not os.path.exists("/.dockerenv")
+        and not has_token
+        and os.environ.get("WHIMSY_ALLOW_UNAUTHENTICATED_BIND") != "1"
+    ):
+        raise RuntimeError(
+            f"Refusing unauthenticated non-loopback bind on '{bind_host}'. "
+            "Set WHIMSY_AUTH_TOKEN (or use loopback 127.0.0.1)."
+        )
+    server = HTTPServer((bind_host, PORT), EngineRequestHandler)
     print(f"==================================================")
-    print(f" Antigravity Local Engine Server Running on {DEFAULT_BIND_HOST}:{PORT}")
+    print(f" Antigravity Local Engine Server Running on {bind_host}:{PORT}")
     print(f" Endpoint: http://localhost:{PORT}/generate")
     print(f" Ready to receive CYOA turn requests from UI...")
     print(f"==================================================")

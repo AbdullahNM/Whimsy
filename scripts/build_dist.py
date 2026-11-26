@@ -15,6 +15,7 @@ Usage:
 
 import argparse
 import base64
+import html as html_lib
 import json
 import os
 import re
@@ -345,16 +346,22 @@ def build_self_contained_html(
             flags=re.IGNORECASE
         )
 
-    # Sanitize JSON payloads for safe inlining inside <script>
+    # Sanitize JSON payloads for safe inlining inside <script> (case-insensitive tag/comment breakout proof)
     def safe_json_embed(data):
         raw = json.dumps(data, ensure_ascii=False)
-        return raw.replace("</script>", "<\\/script>").replace("<!--", "<\\!--")
+        return (
+            raw.replace("&", "\\u0026")
+            .replace("<", "\\u003c")
+            .replace(">", "\\u003e")
+            .replace("\u2028", "\\u2028")
+            .replace("\u2029", "\\u2029")
+        )
 
     # Inlined data script
     data_script = f"""<script>
   /* Inlined Campaign Data for Whimsy CYOA Engine (Single-File Distribution) */
   window.__INLINED_BUILD__ = true;
-  window.__BUNDLED_CAMPAIGN_ID__ = {json.dumps(campaign_id)};
+  window.__BUNDLED_CAMPAIGN_ID__ = {safe_json_embed(campaign_id)};
   window.__CAMPAIGN_CONFIGS__ = {safe_json_embed(campaign_configs)};
   window.__GAMEPLAY_MANIFEST__ = {safe_json_embed(gameplay_manifest)};
   window.__WORLD_BIBLE_DATA__ = {safe_json_embed(world_bible_data)};
@@ -419,11 +426,11 @@ def build_self_contained_html(
             html = re.sub(rf'<script\s+src="{re.escape(script_name)}"><\/script>', "", html)
         html = html.replace("</body>", f"{inlined_scripts}\n</body>")
 
-    # Update page title with campaign title
-    camp_title = campaign_configs[campaign_id].get("title", campaign_id)
+    # Update page title with HTML-escaped campaign title
+    camp_title = html_lib.escape(str(campaign_configs[campaign_id].get("title", campaign_id)), quote=True)
     html = re.sub(
         r"<title>.*?</title>",
-        f"<title>{camp_title} — Whimsy CYOA Engine</title>",
+        lambda m: f"<title>{camp_title} — Whimsy CYOA Engine</title>",
         html,
         flags=re.IGNORECASE
     )
@@ -450,8 +457,7 @@ def build_dist(
     Returns:
         dict with paths of generated artefacts.
     """
-    root = os.path.abspath(root_dir or ROOT)
-    camp_dir = os.path.join(root, "CAMPAIGNS", campaign_id if isinstance(campaign_id, str) else "")
+    root, camp_dir = resolve_authorized_campaign_dir(campaign_id, repo_root=root_dir)
 
     # Preliminary safety check before assembly
     if not isinstance(campaign_id, str) or any(d in campaign_id for d in [",", ";", "|", " "]):
