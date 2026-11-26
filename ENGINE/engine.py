@@ -50,6 +50,177 @@ from ENGINE.transaction_manager import TransactionManager, TransactionError
 
 PORT = int(os.environ.get("ANTIGRAVITY_PORT", 8000))
 
+OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
+FASTROUTER_CHAT_URL = "https://api.fastrouter.ai/api/v1/chat/completions"
+
+
+def resolve_llm_config(payload: dict) -> dict:
+    """Resolve provider, API key, model, and base URL from request payload and environment."""
+    payload = payload or {}
+    provider = (
+        payload.get("provider")
+        or os.environ.get("WHIMSY_PROVIDER")
+        or ""
+    ).strip().lower()
+    api_base = (
+        payload.get("apiBaseUrl")
+        or payload.get("api_base_url")
+        or os.environ.get("WHIMSY_API_BASE")
+        or ""
+    ).strip()
+    model = (
+        payload.get("model")
+        or os.environ.get("WHIMSY_MODEL")
+        or ""
+    ).strip()
+    api_key = (
+        payload.get("apiKey")
+        or payload.get("api_key")
+        or os.environ.get("WHIMSY_API_KEY")
+        or os.environ.get("FASTROUTER_API_KEY")
+        or os.environ.get("OPENROUTER_API_KEY")
+        or os.environ.get("GEMINI_API_KEY")
+        or ""
+    ).strip()
+
+    if not provider:
+        if model.startswith("fastrouter/") or "fastrouter.ai" in api_base or (
+            os.environ.get("FASTROUTER_API_KEY") and not payload.get("apiKey") and not payload.get("api_key")
+        ):
+            provider = "fastrouter"
+        elif (
+            api_key.startswith("sk-or-")
+            or model.startswith("openrouter/")
+            or "openrouter.ai" in api_base
+            or (os.environ.get("OPENROUTER_API_KEY") and not payload.get("apiKey") and not payload.get("api_key"))
+        ):
+            provider = "openrouter"
+        elif api_base:
+            provider = "custom"
+        elif api_key.startswith("AIza") or (model.startswith("gemini") and "/" not in model):
+            provider = "gemini"
+        elif "/" in model or any(k in model for k in ("claude", "gpt", "llama", "deepseek", "qwen", "mistral")):
+            provider = "openrouter"
+        elif api_key:
+            provider = "openrouter"
+
+    if provider == "fastrouter" and not model:
+        model = os.environ.get("FASTROUTER_MODEL") or "openai/gpt-4o-mini"
+    elif provider == "openrouter" and not model:
+        model = os.environ.get("OPENROUTER_MODEL") or "anthropic/claude-3.5-sonnet"
+    elif provider == "gemini" and not model:
+        model = "gemini-2.5-flash"
+
+    return {
+        "provider": provider,
+        "api_key": api_key,
+        "model": model,
+        "api_base": api_base,
+    }
+
+
+def _read_text_safe(path: str) -> str:
+    if os.path.isfile(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+    return ""
+
+
+def _read_json_safe(path: str):
+    if os.path.isfile(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return None
+    return None
+
+
+def list_workspace_campaigns(root_dir: str) -> list[dict]:
+    """List campaigns with valid campaign_config.json under CAMPAIGNS/."""
+    campaigns_dir = os.path.join(root_dir, "CAMPAIGNS")
+    items = []
+    if not os.path.isdir(campaigns_dir):
+        return items
+    for name in sorted(os.listdir(campaigns_dir)):
+        cdir = os.path.join(campaigns_dir, name)
+        cfg_path = os.path.join(cdir, "campaign_config.json")
+        if os.path.isdir(cdir) and os.path.isfile(cfg_path):
+            cfg = _read_json_safe(cfg_path)
+            if isinstance(cfg, dict):
+                items.append({"id": cfg.get("id", name), "config": cfg})
+    return items
+
+
+def load_campaign_bundle(root_dir: str, campaign_id: str) -> dict | None:
+    """Load full disk state for a campaign so the browser UI can hydrate without FSA."""
+    if not campaign_id or ".." in campaign_id or "/" in campaign_id or "\\" in campaign_id:
+        return None
+    cdir = os.path.join(root_dir, "CAMPAIGNS", campaign_id)
+    if not os.path.isdir(cdir):
+        return None
+
+    cfg = _read_json_safe(os.path.join(cdir, "campaign_config.json"))
+    if not isinstance(cfg, dict):
+        return None
+
+    gp_dir = os.path.join(cdir, "GAMEPLAY")
+    active_dir = os.path.join(cdir, "TURNS", "ACTIVE")
+    active_turns = []
+    if os.path.isdir(active_dir):
+        for fname in sorted(os.listdir(active_dir)):
+            if fname.endswith(".md"):
+                active_turns.append({
+                    "name": fname,
+                    "content": _read_text_safe(os.path.join(active_dir, fname)),
+                })
+
+    world_bible = {}
+    bible_dir = os.path.join(cdir, "WORLD_BIBLE")
+    if os.path.isdir(bible_dir):
+        import re as _re
+        for cat in sorted(os.listdir(bible_dir)):
+            cat_dir = os.path.join(bible_dir, cat)
+            if not os.path.isdir(cat_dir):
+                continue
+            articles = []
+            for fname in sorted(os.listdir(cat_dir)):
+                if not fname.endswith(".md"):
+                    continue
+                content = _read_text_safe(os.path.join(cat_dir, fname))
+                m = _re.search(r"^#\s+(.+)$", content, _re.MULTILINE)
+                title = m.group(1).strip() if m else os.path.splitext(fname)[0].replace("_", " ").title()
+                articles.append({
+                    "id": os.path.splitext(fname)[0],
+                    "title": title,
+                    "content": content,
+                })
+            if articles:
+                world_bible[cat] = articles
+
+    from ENGINE.agent_channel import AgentChannelManager
+    channel_msgs = AgentChannelManager(cdir).load_messages(force_disk=True)
+
+    return {
+        "campaign_id": cfg.get("id", campaign_id),
+        "config": cfg,
+        "status_json": _read_json_safe(os.path.join(gp_dir, "status.json")),
+        "status": _read_text_safe(os.path.join(gp_dir, "status.md")),
+        "relations_json": _read_json_safe(os.path.join(gp_dir, "relations.json")),
+        "relations": _read_text_safe(os.path.join(gp_dir, "relations.md")),
+        "items_json": _read_json_safe(os.path.join(gp_dir, "items.json")),
+        "items": _read_text_safe(os.path.join(gp_dir, "items.md")),
+        "upcoming_hooks": _read_text_safe(os.path.join(gp_dir, "upcoming_hooks.md")),
+        "ontology_json": (
+            _read_json_safe(os.path.join(cdir, "ontology.json"))
+            or _read_json_safe(os.path.join(cdir, "WORLD_FOUNDATION", "ontology.json"))
+        ),
+        "narrative_steering": _read_text_safe(os.path.join(cdir, "IDEAS", "narrative_steering.md")),
+        "agent_channel": channel_msgs,
+        "active_turns": active_turns,
+        "world_bible": world_bible,
+    }
+
 
 class EngineRequestHandler(BaseHTTPRequestHandler):
     current_mode = "classic_cyoa"
@@ -96,11 +267,33 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
                 "object": "list",
                 "data": [
                     {"id": "local-antigravity", "object": "model", "owned_by": "antigravity"},
+                    {"id": "openrouter/anthropic/claude-3.5-sonnet", "object": "model", "owned_by": "openrouter"},
+                    {"id": "openrouter/google/gemini-2.5-flash", "object": "model", "owned_by": "openrouter"},
+                    {"id": "fastrouter/openai/gpt-4o-mini", "object": "model", "owned_by": "fastrouter"},
+                    {"id": "fastrouter/anthropic/claude-3.5-sonnet", "object": "model", "owned_by": "fastrouter"},
                     {"id": "gemini-2.5-flash", "object": "model", "owned_by": "google"},
                     {"id": "gemini-2.5-pro", "object": "model", "owned_by": "google"}
                 ]
             }
             self.wfile.write(json.dumps(models_data).encode("utf-8"))
+        elif self.path in ["/campaigns", "/api/campaigns"]:
+            campaigns = list_workspace_campaigns(ROOT_DIR)
+            self._set_cors_headers(200)
+            self.wfile.write(json.dumps({
+                "campaigns": [c["id"] for c in campaigns],
+                "configs": {c["id"]: c["config"] for c in campaigns}
+            }).encode("utf-8"))
+        elif self.path.startswith("/api/campaign?") or self.path.startswith("/campaign?"):
+            from urllib.parse import urlparse, parse_qs
+            query = parse_qs(urlparse(self.path).query)
+            campaign = query.get("campaign", ["template_campaign"])[0]
+            bundle = load_campaign_bundle(ROOT_DIR, campaign)
+            if not bundle:
+                self._set_cors_headers(404)
+                self.wfile.write(json.dumps({"error": f"Campaign '{campaign}' not found"}).encode("utf-8"))
+                return
+            self._set_cors_headers(200)
+            self.wfile.write(json.dumps(bundle).encode("utf-8"))
         elif self.path.startswith("/telemetry") or self.path.startswith("/api/telemetry"):
             from urllib.parse import urlparse, parse_qs
             from ENGINE.telemetry import get_campaign_telemetry_summary, read_campaign_telemetry
@@ -671,14 +864,65 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
 
             campaign = payload.get("campaign", payload.get("campaign_id", "template_campaign"))
             query = payload.get("query", "")
+            llm_cfg = resolve_llm_config(payload)
+            post_to_channel = bool(payload.get("post_to_channel", False))
+            apply_recal = bool(payload.get("apply_recal", False))
             try:
                 from ENGINE.campaign_builder import consult_shadow_narrator
-                result = consult_shadow_narrator(ROOT_DIR, campaign, query)
+                result = consult_shadow_narrator(
+                    ROOT_DIR,
+                    campaign,
+                    query,
+                    api_key=llm_cfg.get("api_key") or None,
+                    provider=llm_cfg.get("provider") or None,
+                    model=llm_cfg.get("model") or None,
+                    api_base_url=llm_cfg.get("api_base") or None,
+                    post_to_channel=post_to_channel,
+                    apply_recal=apply_recal,
+                )
                 self._set_cors_headers(200)
                 self.wfile.write(json.dumps(result).encode("utf-8"))
             except Exception as e:
                 self._set_cors_headers(500)
                 self.wfile.write(json.dumps({"error": f"Shadow consultation error: {str(e)}"}).encode("utf-8"))
+        elif self.path in ["/api/test_connection", "/test_connection"]:
+            content_len = int(self.headers.get("Content-Length", 0))
+            raw_body = self.rfile.read(content_len)
+            try:
+                payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+            except Exception as e:
+                self._set_cors_headers(400)
+                self.wfile.write(json.dumps({"ok": False, "error": f"Invalid JSON payload: {str(e)}"}).encode("utf-8"))
+                return
+
+            llm_cfg = resolve_llm_config(payload)
+            if not llm_cfg["api_key"]:
+                self._set_cors_headers(200)
+                self.wfile.write(json.dumps({
+                    "ok": True,
+                    "mode": "offline_deterministic",
+                    "provider": "local-antigravity",
+                    "message": "Local engine online (no cloud key supplied; deterministic fallback active)."
+                }).encode("utf-8"))
+                return
+
+            try:
+                reply = self._ping_llm(llm_cfg)
+                self._set_cors_headers(200)
+                self.wfile.write(json.dumps({
+                    "ok": True,
+                    "provider": llm_cfg["provider"],
+                    "model": llm_cfg["model"],
+                    "message": f"Connected to {llm_cfg['provider']} ({llm_cfg['model']}): {reply[:80]}"
+                }).encode("utf-8"))
+            except Exception as e:
+                self._set_cors_headers(502)
+                self.wfile.write(json.dumps({
+                    "ok": False,
+                    "provider": llm_cfg["provider"],
+                    "model": llm_cfg["model"],
+                    "error": str(e)
+                }).encode("utf-8"))
         else:
             self._set_cors_headers(404)
             self.wfile.write(json.dumps({"error": "Unknown POST route"}).encode("utf-8"))
@@ -687,34 +931,45 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
         self, campaign: str, action: str, pacing: str, turn: int, payload: dict,
         system_prompt: str = "", outcome: Outcome = None
     ) -> str:
-        # Check if environment or payload has an API key (OpenRouter or Gemini)
-        api_key = (
-            payload.get("apiKey")
-            or payload.get("api_key")
-            or os.environ.get("OPENROUTER_API_KEY")
-            or os.environ.get("GEMINI_API_KEY")
-        )
-        model = payload.get("model") or os.environ.get("WHIMSY_MODEL")
+        llm_cfg = resolve_llm_config(payload)
+        api_key = llm_cfg["api_key"]
+        model = llm_cfg["model"]
+        provider = llm_cfg["provider"]
+        api_base = llm_cfg["api_base"]
 
         outcome_context = ""
         if outcome:
-            outcome_context = f"\n\n[AUTHORITATIVE CORE OUTCOME (DO NOT MUTATE STATE BEYOND THIS)]:\n{outcome.to_json()}\n"
+            outcome_context = (
+                "\n\n[AUTHORITATIVE CORE OUTCOME (DO NOT MUTATE STATE BEYOND THIS)]:\n"
+                f"{outcome.to_json()}\n"
+                "\n[NARRATION OUTPUT FORMAT]:\n"
+                "- Write 1 to 3 crisp, grounded sensory paragraphs (<=35 words per sentence).\n"
+                "- Respect any active SHADOW -> ACTIVE directives from agent_channel.md.\n"
+                "- Do NOT include formulaic endings like 'What will you do?' or 'The choice is yours'.\n"
+                "- End with `### [OPTIONS & TYPABLE REFERENCE]` followed by 3 to 5 numbered choices, "
+                "and finish with `[SYS: Turn <next_turn> | ... | Checkpoints: 5/5]`."
+            )
 
         if api_key:
             full_system_prompt = (system_prompt + outcome_context) if system_prompt else outcome_context
-            is_openrouter = (
-                api_key.startswith("sk-or-")
-                or "OPENROUTER_API_KEY" in os.environ
-                or (model and ("/" in model or "claude" in model or "gpt" in model or "llama" in model or "deepseek" in model))
-            )
-            if is_openrouter:
+            if provider == "fastrouter":
+                try:
+                    return self._call_fastrouter(api_key, campaign, action, pacing, turn, full_system_prompt, model=model, api_base=api_base)
+                except Exception as e:
+                    print(f"[Engine] FastRouter call failed: {e}. Falling back to rule-based simulation.")
+            elif provider == "openrouter":
                 try:
                     return self._call_openrouter(api_key, campaign, action, pacing, turn, full_system_prompt, model=model)
                 except Exception as e:
                     print(f"[Engine] OpenRouter call failed: {e}. Falling back to rule-based simulation.")
+            elif provider == "custom" and api_base:
+                try:
+                    return self._call_openai_compatible(api_base, api_key, campaign, action, pacing, turn, full_system_prompt, model=model)
+                except Exception as e:
+                    print(f"[Engine] Custom endpoint call failed: {e}. Falling back to rule-based simulation.")
             else:
                 try:
-                    return self._call_cloud_gemini(api_key, campaign, action, pacing, turn, full_system_prompt)
+                    return self._call_cloud_gemini(api_key, campaign, action, pacing, turn, full_system_prompt, model=model)
                 except Exception as e:
                     print(f"[Engine] Cloud Gemini call failed: {e}. Falling back to rule-based simulation.")
 
@@ -794,16 +1049,54 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
                 parts.append(f"{label}: {value}")
         return " | ".join(parts)
 
+    def _ping_llm(self, llm_cfg: dict) -> str:
+        """Minimal connectivity check for /api/test_connection."""
+        provider = llm_cfg["provider"]
+        api_key = llm_cfg["api_key"]
+        model = llm_cfg["model"]
+        api_base = llm_cfg["api_base"]
+
+        if provider == "gemini":
+            clean_model = (model or "gemini-2.5-flash").split("/")[-1]
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent?key={api_key}"
+            body = {"contents": [{"role": "user", "parts": [{"text": "Reply with OK."}]}]}
+            req = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"), headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+
+        url = api_base or (FASTROUTER_CHAT_URL if provider == "fastrouter" else OPENROUTER_CHAT_URL)
+        target_model = model or ("openai/gpt-4o-mini" if provider == "fastrouter" else "anthropic/claude-3.5-sonnet")
+        for prefix in ("openrouter/", "fastrouter/"):
+            if target_model.startswith(prefix):
+                target_model = target_model[len(prefix):]
+
+        headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
+        if provider == "openrouter":
+            headers["HTTP-Referer"] = "http://localhost:8000"
+            headers["X-Title"] = "Whimsy Local CYOA Engine"
+        body = {
+            "model": target_model,
+            "messages": [{"role": "user", "content": "Reply with OK."}],
+            "max_tokens": 16,
+            "temperature": 0.0,
+        }
+        req = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"), headers=headers)
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            return data["choices"][0]["message"]["content"].strip()
+
     def _call_cloud_gemini(
-        self, api_key: str, campaign: str, action: str, pacing: str, turn: int, system_prompt: str = ""
+        self, api_key: str, campaign: str, action: str, pacing: str, turn: int, system_prompt: str = "", model: str = ""
     ) -> str:
         if not system_prompt:
             assembler = PromptAssembler(ROOT_DIR)
             system_prompt = assembler.build_system_prompt(campaign)
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+        clean_model = (model or "gemini-2.5-flash").split("/")[-1]
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent?key={api_key}"
 
         body = {
-            "contents": [{"role": "user", "parts": [{"text": f"Player Action for Turn {turn}: {action}"}]}],
+            "contents": [{"role": "user", "parts": [{"text": f"Player Action for Turn {turn} (pacing={pacing}): {action}"}]}],
             "systemInstruction": {"parts": [{"text": system_prompt}]}
         }
 
@@ -816,42 +1109,74 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
             data = json.loads(resp.read().decode("utf-8"))
             return data["candidates"][0]["content"]["parts"][0]["text"]
 
-    def _call_openrouter(
-        self, api_key: str, campaign: str, action: str, pacing: str, turn: int, system_prompt: str = "", model: str = ""
+    def _call_openai_compatible(
+        self, url: str, api_key: str, campaign: str, action: str, pacing: str, turn: int,
+        system_prompt: str = "", model: str = "", extra_headers: dict = None
     ) -> str:
         if not system_prompt:
             assembler = PromptAssembler(ROOT_DIR)
             system_prompt = assembler.build_system_prompt(campaign)
-        url = "https://openrouter.ai/api/v1/chat/completions"
 
-        target_model = model or os.environ.get("OPENROUTER_MODEL") or "anthropic/claude-3.5-sonnet"
-        if target_model.startswith("openrouter/"):
-            target_model = target_model.replace("openrouter/", "")
+        target_model = model or "anthropic/claude-3.5-sonnet"
+        for prefix in ("openrouter/", "fastrouter/"):
+            if target_model.startswith(prefix):
+                target_model = target_model[len(prefix):]
 
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": f"Player Action for Turn {turn}: {action}"})
+        messages.append({"role": "user", "content": f"Player Action for Turn {turn} (pacing={pacing}): {action}"})
 
         body = {
             "model": target_model,
             "messages": messages,
             "temperature": 0.7
         }
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        }
+        if extra_headers:
+            headers.update(extra_headers)
 
         req = urllib.request.Request(
             url,
             data=json.dumps(body).encode("utf-8"),
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {api_key}",
-                "HTTP-Referer": "http://localhost:8000",
-                "X-Title": "Whimsy Local CYOA Engine"
-            }
+            headers=headers
         )
         with urllib.request.urlopen(req, timeout=45) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             return data["choices"][0]["message"]["content"]
+
+    def _call_fastrouter(
+        self, api_key: str, campaign: str, action: str, pacing: str, turn: int,
+        system_prompt: str = "", model: str = "", api_base: str = ""
+    ) -> str:
+        url = api_base or FASTROUTER_CHAT_URL
+        target_model = model or os.environ.get("FASTROUTER_MODEL") or "openai/gpt-4o-mini"
+        return self._call_openai_compatible(
+            url, api_key, campaign, action, pacing, turn,
+            system_prompt=system_prompt, model=target_model
+        )
+
+    def _call_openrouter(
+        self, api_key: str, campaign: str, action: str, pacing: str, turn: int, system_prompt: str = "", model: str = ""
+    ) -> str:
+        target_model = model or os.environ.get("OPENROUTER_MODEL") or "anthropic/claude-3.5-sonnet"
+        return self._call_openai_compatible(
+            OPENROUTER_CHAT_URL,
+            api_key,
+            campaign,
+            action,
+            pacing,
+            turn,
+            system_prompt=system_prompt,
+            model=target_model,
+            extra_headers={
+                "HTTP-Referer": "http://localhost:8000",
+                "X-Title": "Whimsy Local CYOA Engine"
+            }
+        )
 
 
 def main():

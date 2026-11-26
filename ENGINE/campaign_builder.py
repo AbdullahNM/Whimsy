@@ -298,19 +298,105 @@ def update_ui_manifests(root_dir: str):
             json.dump(all_manifest, f, indent=2, ensure_ascii=False)
 
 
-def consult_shadow_narrator(root_dir: str, campaign_id: str, query: str) -> dict:
+def _shadow_llm_call(
+    api_key: str,
+    provider: str,
+    model: str,
+    api_base_url: str,
+    system_prompt: str,
+    user_prompt: str,
+) -> str:
+    """Invoke OpenRouter, FastRouter, Gemini, or custom OpenAI-compatible model for Shadow Narrator."""
+    import urllib.request
+
+    prov = (provider or "").strip().lower()
+    if not prov:
+        if (model or "").startswith("fastrouter/") or "fastrouter.ai" in (api_base_url or ""):
+            prov = "fastrouter"
+        elif api_key.startswith("sk-or-") or (model or "").startswith("openrouter/"):
+            prov = "openrouter"
+        elif api_base_url:
+            prov = "custom"
+        elif api_key.startswith("AIza"):
+            prov = "gemini"
+        else:
+            prov = "openrouter"
+
+    if prov == "gemini":
+        clean_model = (model or "gemini-2.5-flash").split("/")[-1]
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent?key={api_key}"
+        body = {
+            "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
+            "systemInstruction": {"parts": [{"text": system_prompt}]},
+        }
+        req = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"), headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+
+    if prov == "fastrouter":
+        url = api_base_url or "https://api.fastrouter.ai/api/v1/chat/completions"
+        target_model = model or "openai/gpt-4o-mini"
+    elif prov == "custom" and api_base_url:
+        url = api_base_url
+        target_model = model or "gpt-4o-mini"
+    else:
+        url = api_base_url or "https://openrouter.ai/api/v1/chat/completions"
+        target_model = model or "anthropic/claude-3.5-sonnet"
+
+    for prefix in ("openrouter/", "fastrouter/"):
+        if target_model.startswith(prefix):
+            target_model = target_model[len(prefix):]
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}",
+    }
+    if prov == "openrouter":
+        headers["HTTP-Referer"] = "http://localhost:8000"
+        headers["X-Title"] = "Whimsy Shadow Narrator"
+
+    body = {
+        "model": target_model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "temperature": 0.5,
+        "max_tokens": 500,
+    }
+    req = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"), headers=headers)
+    with urllib.request.urlopen(req, timeout=35) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+        return data["choices"][0]["message"]["content"].strip()
+
+
+def consult_shadow_narrator(
+    root_dir: str,
+    campaign_id: str,
+    query: str,
+    api_key: str = None,
+    provider: str = None,
+    model: str = None,
+    api_base_url: str = None,
+    post_to_channel: bool = False,
+    apply_recal: bool = False,
+) -> dict:
     """
-    Synthesizes continuity and arc guidance from the campaign's living steering and status files.
+    Synthesizes out-of-character continuity, pacing, and steering guidance from the campaign's
+    living steering, status, recent turns, and agent channel. Optionally posts the directive to
+    IDEAS/agent_channel.md for the Active GM.
     """
     cdir = os.path.join(root_dir, "CAMPAIGNS", campaign_id)
     steering_file = os.path.join(cdir, "IDEAS", "narrative_steering.md")
     status_file = os.path.join(cdir, "GAMEPLAY", "status.json")
-    
+    turns_dir = os.path.join(cdir, "TURNS", "ACTIVE")
+
     steering_text = ""
     if os.path.isfile(steering_file):
         with open(steering_file, "r", encoding="utf-8") as f:
             steering_text = f.read()
-            
+
     status_data = {}
     if os.path.isfile(status_file):
         try:
@@ -319,32 +405,117 @@ def consult_shadow_narrator(root_dir: str, campaign_id: str, query: str) -> dict
         except Exception:
             pass
 
+    recent_turns = []
+    if os.path.isdir(turns_dir):
+        turn_files = sorted(f for f in os.listdir(turns_dir) if f.endswith(".md"))[-3:]
+        for tf in turn_files:
+            try:
+                with open(os.path.join(turns_dir, tf), "r", encoding="utf-8") as f:
+                    recent_turns.append(f"--- {tf} ---\n{f.read()[:1500]}")
+            except Exception:
+                pass
+
+    turn_num = int(status_data.get("turn", 1) or 1)
     pacing = status_data.get("pacing_state", {})
     zoom = pacing.get("zoom_level", "detailed_scene")
     intensity = pacing.get("narrative_intensity", 1)
     location = pacing.get("current_location", status_data.get("scene_anchor", {}).get("location", "Unknown"))
     conflicts = pacing.get("active_conflicts", [])
     threads = status_data.get("public_state", {}).get("open_threads", [])
+    clocks = status_data.get("clocks", [])
+    clocks_summary = ", ".join(f"{c.get('label', c.get('id'))} ({c.get('current', 0)}/{c.get('max', 4)})" for c in clocks) or "None"
 
-    # Generate grounded response
-    response = [
-        f"🔮 **Shadow Narrator Advisory** for *{campaign_id}*:",
-        "",
-        f"- **Current Anchor**: {location} (Intensity: {intensity}/5, Zoom: `{zoom}`)",
-        f"- **Open Threads**: {', '.join(threads) if threads else 'None pending'}",
-        f"- **Active Conflicts**: {', '.join(conflicts) if conflicts else 'None unresolved'}",
-        "",
-        f"**Advisory regarding '{query.strip()}':**",
-        f"Maintain causal momentum without rushing unearned escalations. Given your current camera zoom ({zoom}) and baseline intensity ({intensity}/5), ensure any dramatic shift is tethered to tangible in-world actions and character choices rather than artificial stakes.",
-        "",
-        "**Recommended Next Step**: Pursue your primary scene objective while noting any unaddressed ambient clues in your immediate environment."
-    ]
+    advice_text = ""
+    directive_text = ""
+    used_llm = False
+
+    resolved_key = (
+        api_key
+        or os.environ.get("WHIMSY_API_KEY")
+        or os.environ.get("FASTROUTER_API_KEY")
+        or os.environ.get("OPENROUTER_API_KEY")
+        or os.environ.get("GEMINI_API_KEY")
+    )
+
+    if resolved_key and query.strip():
+        sys_prompt = (
+            "You are the Shadow Narrator & Campaign Architect (out-of-character overseer) for Whimsy CYOA.\n"
+            "Rules:\n"
+            "- NEVER resolve player choices or write in-character turn prose.\n"
+            "- Speak plainly and concisely out-of-character to the player/GM.\n"
+            "- Check grounding, pacing (Zero Micro-Scene Rule), clocks, and CORE-003 style contract.\n"
+            "- Provide:\n"
+            "  1) Concise diagnostic/answer to the player's question.\n"
+            "  2) A crisp 1-2 sentence `ACTIVE GM DIRECTIVE:` for the next turn."
+        )
+        user_prompt = (
+            f"Campaign: {campaign_id} | Turn: {turn_num} | Location: {location}\n"
+            f"Focus: {zoom} | Intensity: {intensity}/5 | Clocks: {clocks_summary}\n"
+            f"Open Threads: {', '.join(threads) if threads else 'None'}\n\n"
+            f"Narrative Steering:\n{steering_text[:2000]}\n\n"
+            f"Recent Turns:\n{chr(10).join(recent_turns)[:3000]}\n\n"
+            f"Player Meta-Query / Steering Request:\n{query.strip()}"
+        )
+        try:
+            advice_text = _shadow_llm_call(
+                resolved_key, provider, model, api_base_url, sys_prompt, user_prompt
+            )
+            used_llm = True
+            dir_match = re.search(r"ACTIVE GM DIRECTIVE:\s*(.+)", advice_text, re.IGNORECASE | re.DOTALL)
+            if dir_match:
+                directive_text = dir_match.group(1).strip().splitlines()[0].strip()
+        except Exception:
+            advice_text = ""
+
+    if not advice_text:
+        clean_q = query.strip() or "General pacing and continuity check"
+        directive_text = (
+            f"Honor player meta-steering ('{clean_q}') while keeping zoom at `{zoom}`, "
+            f"intensity at {intensity}/5, and grounding consequences in {location}."
+        )
+        response = [
+            f"**Shadow Narrator Advisory** for *{campaign_id}* (Turn {turn_num}):",
+            "",
+            f"- **Current Anchor**: {location} (Intensity: {intensity}/5, Zoom: `{zoom}`)",
+            f"- **Active Clocks**: {clocks_summary}",
+            f"- **Open Threads**: {', '.join(threads) if threads else 'None pending'}",
+            f"- **Active Conflicts**: {', '.join(conflicts) if conflicts else 'None unresolved'}",
+            "",
+            f"**Steering Response to '{clean_q}':**",
+            f"Maintain causal continuity and CORE-003 unadorned prose. {directive_text}",
+            "",
+            f"**Active GM Directive**: {directive_text}",
+        ]
+        advice_text = "\n".join(response)
+    elif not directive_text:
+        directive_text = f"Incorporate Shadow Narrator guidance on '{query.strip()}': keep prose grounded in {location} at intensity {intensity}/5."
+
+    channel_messages = None
+    if post_to_channel and os.path.isdir(cdir):
+        try:
+            from ENGINE.agent_channel import AgentChannelManager
+        except ImportError:
+            from agent_channel import AgentChannelManager
+        mgr = AgentChannelManager(cdir)
+        channel_content = directive_text
+        if apply_recal:
+            channel_content += f" [RECAL: {query.strip()} - Expires: Turn {turn_num + 5}]"
+        channel_messages = mgr.post_message(
+            sender="SHADOW",
+            recipient="ACTIVE",
+            content=channel_content,
+            turn=turn_num,
+        )
 
     return {
         "status": "success",
         "campaign_id": campaign_id,
         "query": query,
-        "advice": "\n".join(response),
+        "advice": advice_text,
+        "directive": directive_text,
+        "used_llm": used_llm,
+        "posted_to_channel": bool(post_to_channel and channel_messages is not None),
+        "channel_messages": channel_messages,
         "steering": steering_text,
-        "pacing": pacing
+        "pacing": pacing,
     }

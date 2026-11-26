@@ -209,6 +209,54 @@ class TestEngineServer(unittest.TestCase):
             data = json.loads(resp_body.decode("utf-8"))
             self.assertIn("The shadow recedes", data["response"])
 
+    def test_generate_post_with_fastrouter_mock(self):
+        from unittest.mock import patch
+        payload = {
+            "action": "1",
+            "campaign": "template_campaign",
+            "currentTurn": 1,
+            "provider": "fastrouter",
+            "apiKey": "fr-dummy-fastrouter-key",
+            "model": "fastrouter/openai/gpt-4o-mini"
+        }
+        with patch.object(EngineRequestHandler, "_call_fastrouter", return_value="Cold drizzle dampens your collar by the hatch.\n\n### [OPTIONS & TYPABLE REFERENCE]\n1. Advance.\n2. Retreat.\n3. Hold.\n4. Scan.\n\n[SYS: Turn 2 | Checkpoints: 5/5]") as mock_fr:
+            status, headers, resp_body = execute_request(
+                "POST",
+                "/generate",
+                body=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            self.assertEqual(status, 200)
+            data = json.loads(resp_body.decode("utf-8"))
+            self.assertIn("Cold drizzle dampens", data["response"])
+            self.assertEqual(mock_fr.call_count, 1)
+
+    def test_campaigns_and_campaign_bundle_endpoints(self):
+        status, _, body = execute_request("GET", "/api/campaigns")
+        self.assertEqual(status, 200)
+        data = json.loads(body.decode("utf-8"))
+        self.assertIn("template_campaign", data.get("campaigns", []))
+        self.assertIn("template_campaign", data.get("configs", {}))
+
+        status2, _, body2 = execute_request("GET", "/api/campaign?campaign=template_campaign")
+        self.assertEqual(status2, 200)
+        bundle = json.loads(body2.decode("utf-8"))
+        self.assertEqual(bundle.get("campaign_id"), "template_campaign")
+        self.assertIn("status_json", bundle)
+        self.assertIn("active_turns", bundle)
+
+    def test_test_connection_offline_mode(self):
+        status, _, body = execute_request(
+            "POST",
+            "/api/test_connection",
+            body=json.dumps({}).encode("utf-8"),
+            headers={"Content-Type": "application/json"}
+        )
+        self.assertEqual(status, 200)
+        data = json.loads(body.decode("utf-8"))
+        self.assertTrue(data.get("ok"))
+        self.assertEqual(data.get("mode"), "offline_deterministic")
+
     def test_generate_post_deterministic_remediation_strips_formulaic_closings(self):
         """Verify that formulaic turn closings are deterministically stripped and validated."""
         from unittest.mock import patch

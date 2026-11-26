@@ -16,7 +16,7 @@
     constructor() {
       this.tier = 2;
       this.name = 'Local Model (WebGPU / WASM / Local Endpoint)';
-      this.defaultTimeoutMs = 8000;
+      this.defaultTimeoutMs = 45000;
     }
 
     /**
@@ -52,9 +52,24 @@
     }
 
     /**
-     * Generate narrative prose using local model endpoint.
+     * Generate narrative prose using local model endpoint (or local Python engine bridge).
      */
-    async generateNarrative({ action, outcome, context = {}, endpoint = 'http://localhost:8000/generate', timeoutMs = null }) {
+    async generateNarrative({
+      action,
+      outcome,
+      context = {},
+      endpoint = 'http://localhost:8000/generate',
+      timeoutMs = null,
+      campaign = null,
+      currentTurn = null,
+      apiKey = null,
+      provider = null,
+      model = null,
+      apiBaseUrl = null,
+      pacing = 'standard',
+      state = null,
+      commit = true
+    }) {
       if (!outcome) {
         throw new Error('LocalNarrator requires a valid deterministic Outcome');
       }
@@ -69,29 +84,42 @@
         }
 
         const prompt = this._buildConstrainedPrompt(action, outcome, context);
+        const actionStr = typeof action === 'string' ? action : (action.text || String(action.num || ''));
+
+        const payload = {
+          prompt: prompt,
+          action: actionStr,
+          outcome: outcome.toDict ? outcome.toDict() : outcome,
+          context: context,
+          campaign: campaign || context.activeConfig?.id || '',
+          currentTurn: currentTurn || outcome.next_state?.turn ? (outcome.next_state.turn - 1) : 1,
+          state: state || outcome.next_state,
+          pacing: pacing || 'standard',
+          apiKey: apiKey || '',
+          provider: provider || '',
+          model: model || '',
+          apiBaseUrl: apiBaseUrl || '',
+          commit: commit,
+          max_tokens: 600,
+          temperature: 0.7
+        };
 
         const res = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            prompt: prompt,
-            action: typeof action === 'string' ? action : action.text,
-            outcome: outcome.toDict ? outcome.toDict() : outcome,
-            context: context,
-            max_tokens: 350,
-            temperature: 0.7
-          }),
+          body: JSON.stringify(payload),
           signal: controller ? controller.signal : undefined
         });
 
         if (timer) clearTimeout(timer);
 
         if (!res.ok) {
-          throw new Error(`Local model endpoint returned HTTP ${res.status}`);
+          const errText = await res.text().catch(() => '');
+          throw new Error(`Local model endpoint returned HTTP ${res.status}${errText ? `: ${errText.slice(0, 180)}` : ''}`);
         }
 
         const data = await res.json();
-        const text = data.text || data.response || data.generated_text || data.choices?.[0]?.text;
+        const text = data.text || data.response || data.generated_text || data.choices?.[0]?.text || data.choices?.[0]?.message?.content;
         if (!text || typeof text !== 'string' || !text.trim()) {
           throw new Error('Local model returned empty narrative response');
         }

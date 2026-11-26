@@ -146,8 +146,13 @@
       coreInstance = null,
       apiKey = null,
       model = null,
+      provider = null,
+      apiBaseUrl = null,
       pacing = 'standard',
-      localEndpoint = null
+      localEndpoint = null,
+      campaign = null,
+      currentTurn = null,
+      commit = true
     }) {
       // 1. STEP 1 (R1, R7): Run Deterministic Turn Resolution FIRST
       const core = this._getCore(coreInstance);
@@ -179,6 +184,8 @@
             context,
             apiKey,
             model,
+            provider,
+            apiBaseUrl,
             pacing
           });
           tierUsed = TIERS.CLOUD;
@@ -194,7 +201,16 @@
             action,
             outcome,
             context,
-            endpoint: localEndpoint
+            endpoint: localEndpoint || 'http://localhost:8000/generate',
+            campaign,
+            currentTurn,
+            apiKey,
+            provider,
+            model,
+            apiBaseUrl,
+            pacing,
+            state,
+            commit
           });
           tierUsed = TIERS.LOCAL;
         } catch (err) {
