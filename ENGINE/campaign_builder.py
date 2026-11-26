@@ -429,13 +429,18 @@ def consult_shadow_narrator(
     directive_text = ""
     used_llm = False
 
-    resolved_key = (
-        api_key
-        or os.environ.get("WHIMSY_API_KEY")
-        or os.environ.get("FASTROUTER_API_KEY")
-        or os.environ.get("OPENROUTER_API_KEY")
-        or os.environ.get("GEMINI_API_KEY")
-    )
+    try:
+        from ENGINE.engine import resolve_llm_config
+    except ImportError:
+        from engine import resolve_llm_config
+
+    llm_cfg = resolve_llm_config({
+        "apiKey": api_key,
+        "provider": provider,
+        "model": model,
+        "apiBaseUrl": api_base_url,
+    })
+    resolved_key = None if llm_cfg.get("credential_error") else (llm_cfg.get("api_key") or None)
 
     if resolved_key and query.strip():
         sys_prompt = (
@@ -458,7 +463,12 @@ def consult_shadow_narrator(
         )
         try:
             advice_text = _shadow_llm_call(
-                resolved_key, provider, model, api_base_url, sys_prompt, user_prompt
+                resolved_key,
+                llm_cfg.get("provider"),
+                llm_cfg.get("model"),
+                llm_cfg.get("api_base"),
+                sys_prompt,
+                user_prompt,
             )
             used_llm = True
             dir_match = re.search(r"ACTIVE GM DIRECTIVE:\s*(.+)", advice_text, re.IGNORECASE | re.DOTALL)

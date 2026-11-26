@@ -10,6 +10,7 @@ import sys
 import io
 import json
 import unittest
+from unittest.mock import patch
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR not in sys.path:
@@ -246,16 +247,223 @@ class TestEngineServer(unittest.TestCase):
         self.assertIn("active_turns", bundle)
 
     def test_test_connection_offline_mode(self):
-        status, _, body = execute_request(
-            "POST",
-            "/api/test_connection",
-            body=json.dumps({}).encode("utf-8"),
-            headers={"Content-Type": "application/json"}
-        )
-        self.assertEqual(status, 200)
-        data = json.loads(body.decode("utf-8"))
-        self.assertTrue(data.get("ok"))
-        self.assertEqual(data.get("mode"), "offline_deterministic")
+        with patch.dict(os.environ, {
+            "WHIMSY_API_KEY": "",
+            "OPENROUTER_API_KEY": "",
+            "FASTROUTER_API_KEY": "",
+            "GEMINI_API_KEY": "",
+        }):
+            status, _, body = execute_request(
+                "POST",
+                "/api/test_connection",
+                body=json.dumps({}).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            self.assertEqual(status, 200)
+            data = json.loads(body.decode("utf-8"))
+            self.assertTrue(data.get("ok"))
+            self.assertEqual(data.get("mode"), "offline_deterministic")
+
+    def test_caller_endpoint_cannot_use_env_secret_and_mocked_http_binds_trusted_hosts(self):
+        from ENGINE.engine import resolve_llm_config, OPENROUTER_CHAT_URL, FASTROUTER_CHAT_URL
+
+        captured = []
+
+        class FakeResponse:
+            def __init__(self, payload_obj):
+                self._data = json.dumps(payload_obj).encode("utf-8")
+
+            def read(self):
+                return self._data
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        def fake_urlopen(req, timeout=45):
+            captured.append((req.full_url, dict(req.header_items())))
+            return FakeResponse({
+                "choices": [{
+                    "message": {
+                        "content": (
+                            "Rain beads along the shuttered sill.\n\n"
+                            "### [OPTIONS & TYPABLE REFERENCE]\n"
+                            "1. Check the ledger.\n2. Bar the door.\n3. Wait.\n\n"
+                            "[SYS: Turn 2 | Checkpoints: 5/5]"
+                        )
+                    }
+                }]
+            })
+
+        env_vars = {
+            "WHIMSY_API_KEY": "",
+            "WHIMSY_PROVIDER": "",
+            "WHIMSY_API_BASE": "",
+            "WHIMSY_MODEL": "",
+            "OPENROUTER_API_KEY": "sk-or-server-secret",
+            "FASTROUTER_API_KEY": "fr-server-secret",
+            "GEMINI_API_KEY": "",
+        }
+        with patch.dict(os.environ, env_vars), patch("urllib.request.urlopen", side_effect=fake_urlopen) as mock_open:
+            # 1) Caller-selected apiBaseUrl WITHOUT caller apiKey MUST fail closed (400 on test_connection, no outbound HTTP)
+            status_err, _, body_err = execute_request(
+                "POST",
+                "/api/test_connection",
+                body=json.dumps({
+                    "provider": "custom",
+                    "apiBaseUrl": "https://evil.example/collect",
+                    "model": "attacker/model"
+                }).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            self.assertEqual(status_err, 400)
+            self.assertFalse(json.loads(body_err.decode("utf-8")).get("ok"))
+            self.assertEqual(mock_open.call_count, 0)
+
+            # /generate with caller-selected apiBaseUrl and NO caller apiKey falls back offline without calling urlopen
+            status_gen_err, _, _ = execute_request(
+                "POST",
+                "/generate",
+                body=json.dumps({
+                    "action": "1",
+                    "campaign": "template_campaign",
+                    "currentTurn": 1,
+                    "apiBaseUrl": "https://evil.example/collect",
+                    "commit": False,
+                }).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            self.assertEqual(status_gen_err, 200)
+            self.assertEqual(mock_open.call_count, 0)
+
+            # 2) Mismatched caller provider without env key for that provider must NOT borrow another provider's env key
+            with patch.dict(os.environ, {"OPENROUTER_API_KEY": "sk-or-only-secret", "FASTROUTER_API_KEY": ""}):
+                cfg_mismatch = resolve_llm_config({"provider": "fastrouter"})
+                self.assertEqual(cfg_mismatch["api_key"], "")
+
+            # 3) Server-side OpenRouter key pairs strictly with trusted OPENROUTER_CHAT_URL
+            captured.clear()
+            status_or, _, body_or = execute_request(
+                "POST",
+                "/api/test_connection",
+                body=json.dumps({"provider": "openrouter"}).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            self.assertEqual(status_or, 200)
+            self.assertTrue(json.loads(body_or.decode("utf-8")).get("ok"))
+            self.assertEqual(len(captured), 1)
+            self.assertEqual(captured[0][0], OPENROUTER_CHAT_URL)
+            self.assertEqual(captured[0][1].get("Authorization"), "Bearer sk-or-server-secret")
+
+            # 4) Server-side FastRouter key pairs strictly with trusted FASTROUTER_CHAT_URL
+            captured.clear()
+            status_fr, _, body_fr = execute_request(
+                "POST",
+                "/api/test_connection",
+                body=json.dumps({"provider": "fastrouter"}).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            self.assertEqual(status_fr, 200)
+            self.assertTrue(json.loads(body_fr.decode("utf-8")).get("ok"))
+            self.assertEqual(len(captured), 1)
+            self.assertEqual(captured[0][0], FASTROUTER_CHAT_URL)
+            self.assertEqual(captured[0][1].get("Authorization"), "Bearer fr-server-secret")
+
+            # 5) Caller-supplied apiKey + apiBaseUrl uses ONLY caller key (never env key)
+            captured.clear()
+            status_custom, _, _ = execute_request(
+                "POST",
+                "/generate",
+                body=json.dumps({
+                    "action": "1",
+                    "campaign": "template_campaign",
+                    "currentTurn": 1,
+                    "provider": "custom",
+                    "apiBaseUrl": "https://custom.example/v1/chat/completions",
+                    "apiKey": "caller-own-key",
+                    "model": "custom/test",
+                    "commit": False,
+                }).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            self.assertEqual(status_custom, 200)
+            self.assertEqual(len(captured), 1)
+            self.assertEqual(captured[0][0], "https://custom.example/v1/chat/completions")
+            self.assertEqual(captured[0][1].get("Authorization"), "Bearer caller-own-key")
+
+    def test_private_campaign_bundles_restricted_and_commit_false_skips_idempotency(self):
+        import tempfile
+        from ENGINE.campaign_builder import scaffold_campaign
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            scaffold_campaign(tmpdir, {"campaign_id": "template_campaign", "title": "Template"})
+            scaffold_campaign(tmpdir, {"campaign_id": "private_diary", "title": "Secret Lore"})
+
+            with patch("ENGINE.engine.ROOT_DIR", tmpdir), patch.dict(os.environ, {"WHIMSY_ALLOW_PRIVATE_CAMPAIGN_API": ""}):
+                status_list, _, body_list = execute_request("GET", "/api/campaigns")
+                self.assertEqual(status_list, 200)
+                c_list = json.loads(body_list.decode("utf-8")).get("campaigns", [])
+                self.assertIn("template_campaign", c_list)
+                self.assertNotIn("private_diary", c_list)
+
+                status_priv, _, _ = execute_request("GET", "/api/campaign?campaign=private_diary")
+                self.assertEqual(status_priv, 403)
+
+            # commit:false must not return cached retry=True even after commit:true recorded same turn+action
+            priv_dir = os.path.join(tmpdir, "CAMPAIGNS", "private_diary")
+            status_c1, _, body_c1 = execute_request(
+                "POST",
+                "/generate",
+                body=json.dumps({
+                    "action": "1",
+                    "campaign": "private_diary",
+                    "campaign_dir": priv_dir,
+                    "root_dir": tmpdir,
+                    "currentTurn": 1,
+                    "commit": True,
+                }).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            self.assertEqual(status_c1, 200, body_c1.decode("utf-8"))
+            self.assertTrue(json.loads(body_c1.decode("utf-8")).get("committed"))
+
+            status_preview, _, body_preview = execute_request(
+                "POST",
+                "/generate",
+                body=json.dumps({
+                    "action": "1",
+                    "campaign": "private_diary",
+                    "campaign_dir": priv_dir,
+                    "root_dir": tmpdir,
+                    "currentTurn": 1,
+                    "commit": False,
+                }).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            self.assertEqual(status_preview, 200, body_preview.decode("utf-8"))
+            preview_data = json.loads(body_preview.decode("utf-8"))
+            self.assertFalse(preview_data.get("committed"))
+            self.assertNotIn("retry", preview_data)
+
+            # Second commit:true call DOES replay committed record idempotently
+            status_replay, _, body_replay = execute_request(
+                "POST",
+                "/generate",
+                body=json.dumps({
+                    "action": "1",
+                    "campaign": "private_diary",
+                    "campaign_dir": priv_dir,
+                    "root_dir": tmpdir,
+                    "currentTurn": 1,
+                    "commit": True,
+                }).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            self.assertEqual(status_replay, 200, body_replay.decode("utf-8"))
+            replay_data = json.loads(body_replay.decode("utf-8"))
+            self.assertTrue(replay_data.get("retry"))
 
     def test_generate_post_deterministic_remediation_strips_formulaic_closings(self):
         """Verify that formulaic turn closings are deterministically stripped and validated."""
