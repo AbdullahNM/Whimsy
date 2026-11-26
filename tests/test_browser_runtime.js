@@ -288,3 +288,159 @@ test('Browser Runtime - CloudNarrator resolves FastRouter vs OpenRouter vs Gemin
   assert.strictEqual(cloudNarrator._resolveProvider('AIzaSyDummyKey123', 'gemini-2.5-flash'), 'gemini');
   assert.strictEqual(cloudNarrator._resolveProvider('custom-key', 'my-model', 'fastrouter'), 'fastrouter');
 });
+
+test('Browser Runtime - LocalNarrator requires pre-turn state, preserves explicit currentTurn, and isolates generic endpoints', async (t) => {
+  const originalFetch = global.fetch;
+
+  const buildTurn5State = () => {
+    const s = getInitialTestState();
+    s.campaign_id = 'harbor_chronicle';
+    s.turn = 5;
+    s.progression.energy = 80;
+    s.progression.stress = 15;
+    s.scene_anchor.location = 'Bellwether Pier';
+    return s;
+  };
+
+  const turn5Config = {
+    seed: 777,
+    operational_mode: 'classic_cyoa',
+    rules: [
+      {
+        match: { choice_index: 1 },
+        progression_delta: { energy: -10 },
+        next_choices: [
+          { index: 1, text: 'Unseal the brine-stained harbor ledger' },
+          { index: 2, text: 'Signal the customs skiff from the jetty' }
+        ]
+      }
+    ]
+  };
+
+  await t.test('Native bridge rejects missing pre-turn state instead of sending resolved next_state', async () => {
+    let fetchCalled = false;
+    global.fetch = async () => {
+      fetchCalled = true;
+      return { ok: true, json: async () => ({ response: 'should not happen' }) };
+    };
+    try {
+      const preState = buildTurn5State();
+      const outcome = Core.resolve(preState, '1', turn5Config);
+      await assert.rejects(
+        () => localNarrator.generateNarrative({
+          action: '1',
+          outcome,
+          endpoint: 'http://localhost:8000/generate',
+          campaign: 'harbor_chronicle',
+          currentTurn: 5
+        }),
+        /pre-turn state/i
+      );
+      assert.strictEqual(fetchCalled, false, 'fetch must not run when pre-turn state is absent');
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  await t.test('Explicit currentTurn is preserved over differing outcome.next_state.turn (non-template Turn 5 scenario)', async () => {
+    const calls = [];
+    global.fetch = async (url, init) => {
+      calls.push({ url, headers: init.headers, body: JSON.parse(init.body) });
+      return {
+        ok: true,
+        json: async () => ({
+          response: (
+            'Brine slicks the piling as you pry the clasp free.\n\n' +
+            '### [OPTIONS & TYPABLE REFERENCE]\n' +
+            '1. Unseal the brine-stained harbor ledger\n' +
+            '2. Signal the customs skiff from the jetty\n\n' +
+            '[SYS: Turn 6 | Energy: 70 / 100 | Checkpoints: 5/5]'
+          )
+        })
+      };
+    };
+
+    try {
+      const preState = buildTurn5State();
+      const res = await tieredNarrator.resolveTurn({
+        state: preState,
+        action: '1',
+        config: turn5Config,
+        preferredTier: TIERS.LOCAL,
+        localEndpoint: 'http://127.0.0.1:8000/generate',
+        campaign: 'harbor_chronicle',
+        currentTurn: 5,
+        commit: true
+      });
+
+      assert.strictEqual(calls.length, 1);
+      const sent = calls[0].body;
+      assert.strictEqual(sent.campaign, 'harbor_chronicle');
+      assert.strictEqual(sent.currentTurn, 5);
+      assert.strictEqual(sent.state.turn, 5, 'native bridge must receive pre-turn Turn 5 state');
+      assert.strictEqual(sent.state.progression.energy, 80, 'pre-turn energy must be sent untouched');
+      assert.strictEqual(res.outcome.next_state.turn, 6);
+      assert.strictEqual(res.outcome.next_state.progression.energy, 70);
+      assert.ok(res.narration.text.includes('Unseal the brine-stained harbor ledger'));
+
+      // Also test when outcome.next_state.turn differs from explicit currentTurn
+      const skewedOutcome = Core.resolve(preState, '1', turn5Config);
+      skewedOutcome.next_state.turn = 9;
+      await localNarrator.generateNarrative({
+        action: '1',
+        outcome: skewedOutcome,
+        state: preState,
+        endpoint: 'http://localhost:8000/generate',
+        campaign: 'harbor_chronicle',
+        currentTurn: 5
+      });
+      assert.strictEqual(calls[1].body.currentTurn, 5, 'explicit currentTurn must override derived fallback');
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  await t.test('Generic local endpoint excludes Whimsy-specific keys and browser credentials unless intended', async () => {
+    const calls = [];
+    global.fetch = async (url, init) => {
+      calls.push({ url, headers: init.headers, body: JSON.parse(init.body) });
+      return {
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: 'Cold harbor fog drifts across the ledger.\n\n[OPTIONS]\n1. Unseal the brine-stained harbor ledger' } }]
+        })
+      };
+    };
+
+    try {
+      const preState = buildTurn5State();
+      const outcome = Core.resolve(preState, '1', turn5Config);
+      await localNarrator.generateNarrative({
+        action: '1',
+        outcome,
+        state: preState,
+        context: { genre: 'Maritime Noir', activeConfig: { id: 'harbor_chronicle' } },
+        endpoint: 'http://localhost:11434/v1/chat/completions',
+        campaign: 'harbor_chronicle',
+        currentTurn: 5,
+        apiKey: 'sk-or-browser-secret',
+        provider: 'openrouter',
+        model: 'openrouter/anthropic/claude-3.5-sonnet',
+        apiBaseUrl: 'https://openrouter.ai/api/v1/chat/completions',
+        pacing: 'standard',
+        commit: true
+      });
+
+      assert.strictEqual(calls.length, 1);
+      const { headers, body } = calls[0];
+      assert.strictEqual(headers.Authorization, undefined);
+      for (const forbidden of ['action', 'outcome', 'context', 'campaign', 'currentTurn', 'state', 'pacing', 'commit', 'apiKey', 'provider', 'apiBaseUrl']) {
+        assert.strictEqual(forbidden in body, false, `generic local endpoint must not receive '${forbidden}'`);
+      }
+      assert.ok(Array.isArray(body.messages) && body.messages.length === 1);
+      assert.strictEqual('model' in body, false, 'cloud-prefixed model should not be sent to generic local endpoint');
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+});
