@@ -529,3 +529,65 @@ test('Browser Runtime - Mobile viewport auto-collapses sidebar on startup', () =
   vm.runInContext(appCode, ctx);
   assert.ok(classes.has('collapsed'), 'sidebar must start collapsed at 390px mobile width');
 });
+
+test('Browser Runtime - Dynamic metrics and status config values are HTML-escaped', () => {
+  const vm = require('vm');
+  const appPath = path.resolve(__dirname, '../UI/app.js');
+  const appCode = fs.readFileSync(appPath, 'utf8');
+  const appendedPills = [];
+  const topMetrics = {
+    innerHTML: '',
+    appendChild: (el) => appendedPills.push(el)
+  };
+  const noopEl = () => ({
+    value: '',
+    textContent: '',
+    innerHTML: '',
+    children: [],
+    style: {},
+    dataset: {},
+    classList: { add: () => {}, remove: () => {}, toggle: () => {}, contains: () => false },
+    addEventListener: () => {},
+    querySelector: () => null,
+    appendChild: () => {}
+  });
+  const ctx = {
+    window: {
+      __INLINED_BUILD__: true,
+      __BUNDLED_CAMPAIGN_ID__: 'xss_metrics',
+      __WORLD_BIBLE_DATA__: {},
+      __CAMPAIGN_CONFIGS__: {
+        xss_metrics: {
+          id: 'xss_metrics',
+          title: 'Safe Title',
+          metrics: [
+            { id: 'hp"><script>alert(1)</script>', label: '<img src=x onerror=alert(2)>', type: 'counter', path: 'turn' }
+          ]
+        }
+      },
+      __GAMEPLAY_MANIFEST__: {
+        xss_metrics: { status_json: { turn: 1, scene_anchor: { context: 'Ready.' } } }
+      }
+    },
+    navigator: {},
+    document: {
+      getElementById: (id) => (id === 'top-metrics-container' ? topMetrics : { ...noopEl(), id }),
+      createElement: () => noopEl(),
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      addEventListener: () => {}
+    },
+    localStorage: { getItem: () => null, setItem: () => {} },
+    console: { log: () => {}, error: () => {}, warn: () => {} },
+    setTimeout: () => {},
+    clearTimeout: () => {}
+  };
+  vm.createContext(ctx);
+  vm.runInContext(appCode, ctx);
+
+  assert.strictEqual(appendedPills.length, 1);
+  const pill = appendedPills[0];
+  assert.ok(!pill.innerHTML.includes('<img'), 'metric label HTML must be escaped');
+  assert.ok(!pill.id.includes('<script>'), 'metric id must strip unsafe characters');
+  assert.ok(pill.innerHTML.includes('&lt;img src=x onerror=alert(2)&gt;'));
+});

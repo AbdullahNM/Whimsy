@@ -4,10 +4,11 @@ services:
     container_name: whimsy-engine
     command: ["engine"]
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       - ANTIGRAVITY_PORT=8000
       - PYTHONUNBUFFERED=1
+      - WHIMSY_AUTH_TOKEN=${WHIMSY_AUTH_TOKEN:-}
     volumes:
       - ./CAMPAIGNS:/app/CAMPAIGNS
     restart: unless-stopped
@@ -17,7 +18,7 @@ services:
     container_name: whimsy-ui
     command: ["ui"]
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
       - engine
     restart: unless-stopped

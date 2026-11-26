@@ -591,6 +591,11 @@ class TestEngineServer(unittest.TestCase):
             )
             self.assertEqual(st_auth, 200)
 
+        # WHIMSY_REQUIRE_AUTH=1 fails closed when no WHIMSY_AUTH_TOKEN is configured
+        with patch.dict(os.environ, {"WHIMSY_REQUIRE_AUTH": "1", "WHIMSY_AUTH_TOKEN": ""}):
+            st_req_auth, _, _ = execute_request("GET", "/api/campaigns")
+            self.assertEqual(st_req_auth, 401)
+
         # 3) Arbitrary filesystem paths outside configured roots are rejected
         with tempfile.TemporaryDirectory() as outside_dir:
             st_bad_root, _, body_bad_root = execute_request(
