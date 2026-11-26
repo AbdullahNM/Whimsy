@@ -281,3 +281,10 @@ test('Browser Runtime - Narration Never Gates Progress (R8 Fallback)', async (t)
   assert.strictEqual(resLocalFail.narration.fallbackOccurred, true);
   assert.strictEqual(resLocalFail.outcome.next_state.turn, 2, 'Game state progressed normally');
 });
+
+test('Browser Runtime - CloudNarrator resolves FastRouter vs OpenRouter vs Gemini providers', () => {
+  assert.strictEqual(cloudNarrator._resolveProvider('fr-12345', 'fastrouter/openai/gpt-4o-mini'), 'fastrouter');
+  assert.strictEqual(cloudNarrator._resolveProvider('sk-or-v1-12345', 'anthropic/claude-3.5-sonnet'), 'openrouter');
+  assert.strictEqual(cloudNarrator._resolveProvider('AIzaSyDummyKey123', 'gemini-2.5-flash'), 'gemini');
+  assert.strictEqual(cloudNarrator._resolveProvider('custom-key', 'my-model', 'fastrouter'), 'fastrouter');
+});

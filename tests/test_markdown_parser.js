@@ -213,3 +213,29 @@ Down in the pit, the provost's whistle shrills across the cold breeze.
   assert.ok(optionsText.includes('Head over to the central mess hall'));
   assert.ok(optionsText.includes('Go down into the ring'));
 });
+
+test('Clean Narrative Viewport - strips System State Delta into receipts', () => {
+  const txTurn = `# Turn 2
+
+## GM Response
+Fog drifts across the harbor pier.
+
+### [OPTIONS & TYPABLE REFERENCE]
+1. Board the skiff.
+2. Check the customs desk.
+
+[SYS: Turn 3 | Checkpoints: 5/5]
+
+## System State Delta
+\`\`\`json
+{
+  "turn": 2
+}
+\`\`\`
+`;
+  const { cleanNarrative, receipts } = splitTurnNarrativeAndReceipts(txTurn);
+  assert.ok(!cleanNarrative.includes('System State Delta'));
+  assert.ok(!cleanNarrative.includes('"turn": 2'));
+  assert.ok(cleanNarrative.includes('Fog drifts across the harbor pier.'));
+  assert.ok(receipts.some(r => r.includes('System State Delta')));
+});

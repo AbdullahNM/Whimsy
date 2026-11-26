@@ -21,8 +21,17 @@ let campaignData = {
   ontologyJson: null,
   narrativeSteering: '',
   upcomingHooks: '',
+  agentChannel: [],
   activeTurns: []
 };
+
+function getEngineBaseUrl() {
+  const endpointEl = document.getElementById('local-endpoint-url');
+  const raw = (endpointEl && endpointEl.value && endpointEl.value.trim())
+    || (typeof localStorage !== 'undefined' && localStorage.getItem('cyoa_local_endpoint'))
+    || 'http://localhost:8000/generate';
+  return raw.replace(/\/generate\/?$/i, '').replace(/\/+$/, '');
+}
 
 // Register Service Worker for PWA / Mobile Install
 if ('serviceWorker' in navigator && (typeof window === 'undefined' || !window.__INLINED_BUILD__)) {
@@ -329,24 +338,39 @@ async function loadInitialData() {
       ]);
       campaignConfigs = await confRes.json();
       gameplayManifest = await gameRes.json();
+
+      // Also discover live campaigns from local Python engine if online
+      if (typeof fetch === 'function') {
+        try {
+          const engRes = await fetch(`${getEngineBaseUrl()}/api/campaigns`, { method: 'GET' });
+          if (engRes && engRes.ok) {
+            const engData = await engRes.json();
+            if (engData && engData.configs) {
+              campaignConfigs = { ...campaignConfigs, ...engData.configs };
+            }
+          }
+        } catch (e) {
+          // Local engine offline; static manifest remains active
+        }
+      }
     }
 
-    // 1. Populate campaign dropdown dynamically from loaded configs
+    // Resolve the selection against the campaigns available in this build.
+    const campaignIds = Object.keys(campaignConfigs);
+    const savedCampaign = localStorage.getItem('cyoa_selected_campaign');
+    const targetVal = [savedCampaign, campaignSelect?.value].find(id => campaignIds.includes(id))
+      ?? campaignIds[0];
+
     if (campaignSelect) {
-      const savedCampaign = localStorage.getItem('cyoa_selected_campaign');
-      const targetVal = (savedCampaign && campaignConfigs[savedCampaign]) 
-        ? savedCampaign 
-        : (campaignSelect.value || Object.keys(campaignConfigs)[0]);
-      
       campaignSelect.innerHTML = '';
-      Object.keys(campaignConfigs).forEach(id => {
+      campaignIds.forEach(id => {
         const opt = document.createElement('option');
         opt.value = id;
         opt.textContent = (campaignConfigs[id].title || id).toUpperCase();
         if (id === targetVal) opt.selected = true;
         campaignSelect.appendChild(opt);
       });
-      campaignSelect.value = targetVal;
+      campaignSelect.value = targetVal ?? '';
     }
 
     applyActiveCampaignConfig();
@@ -462,6 +486,7 @@ function loadManifestDataIntoUI() {
   campaignData.ontologyJson = campData.ontology_json || null;
   campaignData.narrativeSteering = campData.narrative_steering || '';
   campaignData.upcomingHooks = campData.upcoming_hooks || '';
+  campaignData.agentChannel = campData.agent_channel || [];
 
   // Reset active turns and populate from manifest
   campaignData.activeTurns = campData.active_turns ? JSON.parse(JSON.stringify(campData.active_turns)) : [];
@@ -475,6 +500,12 @@ function loadManifestDataIntoUI() {
   }
   renderIdeas(campaignData.narrativeSteering, campaignData.upcomingHooks);
   extractMetrics(campData.status, campData.items, campaignData.statusJson);
+  populateLoreCategories();
+  if (loreCategorySelect && loreCategorySelect.value) {
+    renderWorldBibleCategory(loreCategorySelect.value);
+  }
+  updateEvolutionHUD();
+  updateShadowNarratorView();
 
   if (campaignData.activeTurns.length > 0) {
     renderStoryStream(campaignData.activeTurns);
@@ -484,9 +515,40 @@ function loadManifestDataIntoUI() {
 }
 
 
-// Load campaign either from IndexedDB persistent store or bundled gameplay manifest (R3)
+async function hydrateCampaignFromLocalEngine(campaignId) {
+  if (typeof fetch !== 'function' || (typeof window !== 'undefined' && window.__INLINED_BUILD__)) {
+    return null;
+  }
+  try {
+    const res = await fetch(`${getEngineBaseUrl()}/api/campaign?campaign=${encodeURIComponent(campaignId)}`, { method: 'GET' });
+    if (!res || !res.ok) return null;
+    const bundle = await res.json();
+    if (bundle && bundle.config) {
+      campaignConfigs[campaignId] = bundle.config;
+      gameplayManifest[campaignId] = bundle;
+      if (bundle.world_bible && Object.keys(bundle.world_bible).length > 0) {
+        if (!worldBibleData || Array.isArray(worldBibleData.CORE) || Array.isArray(worldBibleData.PLACES)) {
+          const existingFlat = worldBibleData || {};
+          worldBibleData = { [campaignId]: bundle.world_bible };
+          if (Object.keys(existingFlat).length > 0 && campaignId !== 'template_campaign') {
+            worldBibleData.template_campaign = existingFlat;
+          }
+        } else {
+          worldBibleData[campaignId] = bundle.world_bible;
+        }
+      }
+      return bundle;
+    }
+  } catch (e) {
+    // Engine offline
+  }
+  return null;
+}
+
+// Load campaign either from IndexedDB persistent store, live local engine, or bundled gameplay manifest (R3)
 async function loadCampaignFromStorageOrManifest(campaignId) {
   const selectedId = campaignId || (campaignSelect ? campaignSelect.value : 'template_campaign');
+  const engineBundle = await hydrateCampaignFromLocalEngine(selectedId);
   let savedCampaign = null;
   let savedTurns = [];
 
@@ -497,6 +559,13 @@ async function loadCampaignFromStorageOrManifest(campaignId) {
     }
   } catch (e) {
     console.warn('Could not read campaign state from IndexedDB:', e);
+  }
+
+  // If local engine has newer/equal turns on disk and no newer IndexedDB override, prefer live engine bundle
+  const diskTurn = engineBundle?.status_json?.turn || 0;
+  const savedTurn = savedCampaign?.currentTurn || savedCampaign?.state?.turn || 0;
+  if (engineBundle && diskTurn > savedTurn) {
+    savedCampaign = null;
   }
 
   if (savedCampaign && savedCampaign.state) {
@@ -510,6 +579,7 @@ async function loadCampaignFromStorageOrManifest(campaignId) {
     campaignData.ontologyJson = manifestEntry.ontology_json || null;
     campaignData.upcomingHooks = manifestEntry.upcoming_hooks || '';
     campaignData.narrativeSteering = manifestEntry.narrative_steering || '';
+    campaignData.agentChannel = manifestEntry.agent_channel || [];
 
     if (savedTurns && savedTurns.length > 0) {
       campaignData.activeTurns = savedTurns.map(t => ({
@@ -528,6 +598,12 @@ async function loadCampaignFromStorageOrManifest(campaignId) {
     if (campaignData.ontologyJson) renderOntology(campaignData.ontologyJson);
     renderIdeas(campaignData.narrativeSteering, campaignData.upcomingHooks);
     extractMetrics(campaignData.status, campaignData.items, campaignData.statusJson);
+    populateLoreCategories();
+    if (loreCategorySelect && loreCategorySelect.value) {
+      renderWorldBibleCategory(loreCategorySelect.value);
+    }
+    updateEvolutionHUD();
+    updateShadowNarratorView();
 
     const turnEl = document.getElementById('val-turn');
     if (turnEl) turnEl.textContent = currentTurn;
@@ -557,8 +633,6 @@ function renderOfferedChoices(offeredChoices) {
   });
   setupChoiceButtonListeners();
 }
-
-loadInitialData();
 
 function applyActiveCampaignConfig() {
   const selectedId = campaignSelect ? campaignSelect.value : '';
@@ -1339,8 +1413,8 @@ if (importSaveBtn && importSaveFile) {
 if (campaignSelect) {
   campaignSelect.addEventListener('change', async () => {
     localStorage.setItem('cyoa_selected_campaign', campaignSelect.value);
-    applyActiveCampaignConfig();
     await loadCampaignFromStorageOrManifest(campaignSelect.value);
+    applyActiveCampaignConfig();
     if (dirHandle) {
       loadWorkspace(dirHandle);
     }
@@ -1391,11 +1465,24 @@ const LORE_CATEGORY_LABELS = {
   GUIDES: 'GUIDES (Turn Rules & Schemas)'
 };
 
+function getActiveWorldBibleScope() {
+  if (!worldBibleData) return null;
+  const selectedId = campaignSelect ? campaignSelect.value : 'template_campaign';
+  if (selectedId && worldBibleData[selectedId] && typeof worldBibleData[selectedId] === 'object' && !Array.isArray(worldBibleData[selectedId])) {
+    return worldBibleData[selectedId];
+  }
+  if (worldBibleData.template_campaign && typeof worldBibleData.template_campaign === 'object' && !Array.isArray(worldBibleData.template_campaign)) {
+    return worldBibleData.template_campaign;
+  }
+  return worldBibleData;
+}
+
 // Only offer categories that actually contain articles in world_bible_data.json.
 function populateLoreCategories() {
-  if (!loreCategorySelect || !worldBibleData) return;
+  const scopedBible = getActiveWorldBibleScope();
+  if (!loreCategorySelect || !scopedBible) return;
 
-  const available = Object.keys(worldBibleData).filter(k => Array.isArray(worldBibleData[k]) && worldBibleData[k].length > 0);
+  const available = Object.keys(scopedBible).filter(k => Array.isArray(scopedBible[k]) && scopedBible[k].length > 0);
   if (available.length === 0) return;
 
   const preferred = ['CORE', 'PLACES', 'PEOPLE', 'FACTIONS', 'GUIDES'];
@@ -1425,13 +1512,14 @@ if (loreCategorySelect) {
 }
 
 function renderWorldBibleCategory(category) {
-  if (!worldBibleData || !worldBibleData[category]) {
-    loreArticleList.innerHTML = '<p class="text-muted">No articles found in this category.</p>';
-    loreArticleContent.innerHTML = '';
+  const scopedBible = getActiveWorldBibleScope();
+  if (!scopedBible || !scopedBible[category]) {
+    if (loreArticleList) loreArticleList.innerHTML = '<p class="text-muted">No articles found in this category.</p>';
+    if (loreArticleContent) loreArticleContent.innerHTML = '';
     return;
   }
 
-  const articles = worldBibleData[category];
+  const articles = scopedBible[category];
   loreArticleList.innerHTML = '';
 
   articles.forEach((art, idx) => {
@@ -1507,16 +1595,20 @@ async function executeTurnAction(choiceNum, choiceText) {
 
   try {
     const pacing = localStorage.getItem('cyoa_pacing') || 'standard';
-    const apiKey = localStorage.getItem('gemini_api_key');
-    const selectedModel = modelSelect ? modelSelect.value : (localStorage.getItem('cyoa_model') || 'gemini-2.5-flash');
+    const apiKey = (apiKeyInput && apiKeyInput.value.trim()) || localStorage.getItem('gemini_api_key') || '';
+    const selectedModel = modelSelect ? modelSelect.value : (localStorage.getItem('cyoa_model') || 'local-antigravity');
+    const selectedProvider = localStorage.getItem('cyoa_provider') || '';
+    const apiBaseUrl = localStorage.getItem('cyoa_api_base') || '';
     const localEndpoint = (localEndpointInput && localEndpointInput.value.trim()) || localStorage.getItem('cyoa_local_endpoint') || 'http://localhost:8000/generate';
 
     const activeCfg = campaignConfigs[selectedCampaign] || activeConfig || {};
     const stateInput = campaignData.statusJson || (gameplayManifest[selectedCampaign] && gameplayManifest[selectedCampaign].status_json) || { turn: resolvingTurn };
 
-    const actionInput = (choiceNum !== undefined && choiceNum !== null && String(choiceNum).trim() !== '')
-      ? String(choiceNum).trim()
-      : playerAction;
+    const actionInput = (activeCfg.operational_mode === 'freeform_simulation' && recal)
+      ? playerAction
+      : ((choiceNum !== undefined && choiceNum !== null && String(choiceNum).trim() !== '')
+          ? String(choiceNum).trim()
+          : playerAction);
 
     const coreConfig = {
       ...activeCfg,
@@ -1529,6 +1621,10 @@ async function executeTurnAction(choiceNum, choiceText) {
       character: stateInput.character,
       activeConfig: activeCfg,
       upcomingHooks: campaignData.upcomingHooks,
+      statusText: campaignData.status,
+      relationsText: campaignData.relations,
+      itemsText: campaignData.items,
+      agentChannel: campaignData.agentChannel,
       genre: activeCfg.genre
     };
 
@@ -1542,8 +1638,13 @@ async function executeTurnAction(choiceNum, choiceText) {
         context: narratorContext,
         apiKey: apiKey,
         model: selectedModel,
+        provider: selectedProvider,
+        apiBaseUrl: apiBaseUrl,
         pacing: pacing,
-        localEndpoint: localEndpoint
+        localEndpoint: localEndpoint,
+        campaign: selectedCampaign,
+        currentTurn: resolvingTurn,
+        commit: selectedCampaign !== 'template_campaign'
       });
       outcome = res.outcome;
       narration = res.narration;
@@ -1558,6 +1659,9 @@ async function executeTurnAction(choiceNum, choiceText) {
     }
 
     const response = narration.text;
+    if (narration.fallbackOccurred && narration.error) {
+      showToast(`Using offline narrator fallback: ${narration.error}`, 'error', 5000);
+    }
 
     // Format full turn file content with standard Turn / Player Action / GM Response headers
     const turnFileName = `turn_${String(resolvingTurn).padStart(4, '0')}.md`;
@@ -1585,6 +1689,8 @@ async function executeTurnAction(choiceNum, choiceText) {
     // Refresh UI with deterministic state
     renderSchemaDrivenStatus(campaignData.statusJson, activeConfig, campaignData.status);
     extractMetrics(campaignData.status, campaignData.items, campaignData.statusJson);
+    updateEvolutionHUD();
+    updateShadowNarratorView();
 
     // Persist to IndexedDB (R3)
     if (window.WhimsyStorage) {
@@ -1608,14 +1714,17 @@ async function executeTurnAction(choiceNum, choiceText) {
       });
     }
 
-    // Dual persistence to disk if workspace handle is connected
-    if (dirHandle) {
+    // Dual persistence to disk if workspace handle is connected (skip duplicate write when Tier 2 engine committed)
+    if (dirHandle && narration.tierUsed !== 2) {
       await updateAndPersistState(response);
       await saveTurnToDisk(resolvingTurn, playerAction, response);
     }
 
     // Offer new choices from deterministic outcome or response
-    if (outcome && outcome.offered_choices && outcome.offered_choices.length > 0) {
+    const parsedFromProse = (narration.tierUsed >= 2 && /\[OPTIONS/i.test(response));
+    if (parsedFromProse) {
+      parseAndRenderNewChoices(response);
+    } else if (outcome && outcome.offered_choices && outcome.offered_choices.length > 0) {
       renderOfferedChoices(outcome.offered_choices);
     } else {
       parseAndRenderNewChoices(response);
@@ -1623,164 +1732,6 @@ async function executeTurnAction(choiceNum, choiceText) {
   } catch (err) {
     loadingBody.innerHTML = `<p style="color: var(--accent-crimson)"><strong>Resolution Error:</strong> ${escapeHtml(err.message)}</p>`;
   }
-}
-
-async function callGeminiAPI(apiKey, playerAction, pacing) {
-  const model = modelSelect ? modelSelect.value : (localStorage.getItem('cyoa_model') || 'local-antigravity');
-  const campaignTitle = activeConfig ? activeConfig.title : 'CYOA RPG';
-  const selectedCampaign = campaignSelect ? campaignSelect.value : '';
-
-  let pacingGuideline = "Write exactly 2 to 3 balanced paragraphs of vivid, high-sensory narrative.";
-  if (pacing === 'concise') {
-    pacingGuideline = "Write exactly 1 to 2 short, punchy paragraphs. Keep scene transition tight and crisp.";
-  } else if (pacing === 'expansive') {
-    pacingGuideline = "Write 3 to 4 immersive, atmospheric paragraphs with rich NPC dialogue and environmental detail.";
-  }
-
-  // 1. Local Engine / Antigravity Dispatch
-  if (model === 'local-antigravity' || model === 'local-endpoint') {
-    const endpoint = (localEndpointInput && localEndpointInput.value.trim()) || localStorage.getItem('cyoa_local_endpoint') || 'http://localhost:8000/generate';
-    try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: playerAction,
-          pacing: pacing,
-          campaign: selectedCampaign,
-          currentTurn: currentTurn,
-          state: campaignData.statusJson || campaignData.status,
-          relations: campaignData.relationsJson || campaignData.relations,
-          items: campaignData.itemsJson || campaignData.items,
-          pacingGuideline: pacingGuideline,
-          apiKey: apiKey || '',
-          model: model || ''
-        })
-      });
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`Local engine returned HTTP ${res.status}: ${errText}`);
-      }
-      const data = await res.json();
-      if (data.mode || data.zoom_level || (data.pacing_state && data.pacing_state.timeline_stamp)) {
-        updateEvolutionHUD(data.mode, data.zoom_level, data.pacing_state ? data.pacing_state.timeline_stamp : null);
-      }
-      if (data.pacing_state && campaignData.statusJson) {
-        campaignData.statusJson.pacing_state = data.pacing_state;
-      }
-      return data.response || data.text || data.candidates?.[0]?.content?.parts?.[0]?.text || data.choices?.[0]?.message?.content || JSON.stringify(data);
-    } catch (err) {
-      throw new Error(`Local Antigravity engine is not responding at ${endpoint}.\n\n• To run locally: run \`python3 ENGINE/engine.py\` in your terminal\n• Or switch to OpenRouter or Gemini in Settings (⚙).`);
-    }
-  }
-
-  // 2. OpenRouter API Dispatch (Browser Direct)
-  if (model.startsWith('openrouter/') || (apiKey && apiKey.startsWith('sk-or-'))) {
-    const orModel = model.startsWith('openrouter/') ? model.replace('openrouter/', '') : 'anthropic/claude-3.5-sonnet';
-    const dynamicState = `
-# AUTHORITATIVE LIVING STATE (GAMEPLAY):
-${campaignData.status || (campaignData.statusJson ? JSON.stringify(campaignData.statusJson, null, 2) : "Active Scene Anchor loaded")}
-
-# SOCIAL STANDING & RELATIONSHIPS:
-${campaignData.relations || "Allies and mentors active"}
-
-# INVENTORY & ASSETS:
-${campaignData.items || "Equipped gear and regalia intact"}
-`;
-    const trackedMetrics = (activeConfig && activeConfig.metrics || [])
-      .map(m => `${m.label}${m.max_path ? ' (current / max)' : ''}`)
-      .join(', ') || 'narrative milestones only';
-
-    const systemInstruction = `You are the Game Master for the ${campaignTitle} CYOA RPG.
-${dynamicState}
-
-Tracked values: ${trackedMetrics}.
-
-Formatting & Pacing Rules (CORE-002 & CORE-003):
-1. ${pacingGuideline} Lead with physical choreography and grounded sensory details.
-2. Provide proactive living NPC initiative.
-3. Conclude with 3 to 6 actionable numbered choices (e.g. "1. [Action text]").
-4. Proactive Receipts: If a tracked value shifts, append one exact line:
-   [PROGRESSION/RESOURCE RESOLUTION: Previous: X | Delta: ±Y (Reason) | New Total: Z]
-5. Always finish with the system block:
-   [SYS: Turn ${currentTurn + 1} | <tracked values> | Checkpoints: <C>/5]`;
-
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': window.location.origin,
-        'X-Title': 'Whimsy CYOA RPG'
-      },
-      body: JSON.stringify({
-        model: orModel,
-        messages: [
-          { role: 'system', content: systemInstruction },
-          { role: 'user', content: `Player Action for Turn ${currentTurn}: ${playerAction}` }
-        ],
-        temperature: 0.7
-      })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error?.message || 'OpenRouter request failed');
-    return data.choices[0].message.content;
-  }
-
-  // 3. Cloud Gemini API Dispatch
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-  // Build dynamic system instruction using loaded GAMEPLAY files
-  const dynamicState = `
-# AUTHORITATIVE LIVING STATE (GAMEPLAY):
-${campaignData.status || (campaignData.statusJson ? JSON.stringify(campaignData.statusJson, null, 2) : "Active Scene Anchor loaded")}
-
-# SOCIAL STANDING & RELATIONSHIPS:
-${campaignData.relations || "Allies and mentors active"}
-
-# INVENTORY & ASSETS:
-${campaignData.items || "Equipped gear and regalia intact"}
-`;
-
-  const trackedMetrics = (activeConfig && activeConfig.metrics || [])
-    .map(m => `${m.label}${m.max_path ? ' (current / max)' : ''}`)
-    .join(', ') || 'narrative milestones only';
-
-  const payload = {
-    contents: [
-      {
-        role: "user",
-        parts: [{ text: `Player Action: ${playerAction}` }]
-      }
-    ],
-    systemInstruction: {
-      parts: [{
-        text: `You are the Game Master for the ${campaignTitle} CYOA RPG.
-${dynamicState}
-
-Tracked values: ${trackedMetrics}.
-
-Formatting & Pacing Rules (CORE-002 & CORE-003):
-1. ${pacingGuideline} Lead with physical choreography and grounded sensory details.
-2. Provide proactive living NPC initiative.
-3. Conclude with 3 to 6 actionable numbered choices (e.g. "1. [Action text]").
-4. Proactive Receipts: If a tracked value shifts, append one exact line:
-   [PROGRESSION/RESOURCE RESOLUTION: Previous: X | Delta: ±Y (Reason) | New Total: Z]
-5. Always finish with the system block:
-   [SYS: Turn ${currentTurn + 1} | <tracked values> | Checkpoints: <C>/5]`
-      }]
-    }
-  };
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
-
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error?.message || 'API request failed');
-  return data.candidates[0].content.parts[0].text;
 }
 
 async function updateAndPersistState(text) {
@@ -2268,25 +2219,31 @@ function splitTurnNarrativeAndReceipts(rawContent) {
   let narrative = rawContent;
   let optionsText = '';
 
-  // Extract receipt blocks: [XP RESOLUTION...], [CURRENCY RESOLUTION...], [ITEM RESOLUTION...], [SYS: ...]
-  const receiptRegex = /\[(XP RESOLUTION|CURRENCY RESOLUTION|ITEM RESOLUTION|SYS)[^\]]*\]/gi;
+  // Extract ## System State Delta JSON blocks into receipts so raw JSON stays out of narrative prose
+  narrative = narrative.replace(/##\s*System State Delta[\s\S]*?(?=\n#\s|$)/gi, (deltaBlock) => {
+    receipts.push(deltaBlock.trim());
+    return '';
+  });
+
+  // Extract receipt blocks: [XP RESOLUTION...], [PROGRESSION...], [CURRENCY...], [ITEM RESOLUTION...], [SYS: ...]
+  const receiptRegex = /\[(?:PROGRESSION(?:\/XP)? RESOLUTION|XP RESOLUTION|CURRENCY(?:\/RESOURCE)? RESOLUTION|ITEM RESOLUTION|SYS)[^\]]*\]/gi;
   let match;
-  while ((match = receiptRegex.exec(rawContent)) !== null) {
+  while ((match = receiptRegex.exec(narrative)) !== null) {
     receipts.push(match[0]);
   }
 
   // Extract options text if present
-  const optionsMatch = narrative.match(/\[OPTIONS(?: & TYPABLE REFERENCE)?\]([\s\S]*?)(?=\[SYS:|\n\n\[|$)/i);
+  const optionsMatch = narrative.match(/\[OPTIONS(?: & TYPABLE REFERENCE)?\]([\s\S]*?)(?=\[SYS:|\[(?:PROGRESSION|XP|CURRENCY|ITEM)|##\s*System State Delta|\n\n\[|$)/i);
   if (optionsMatch) {
     optionsText = optionsMatch[1].trim();
   }
 
-  // Remove [OPTIONS & TYPABLE REFERENCE] section and everything following it
-  narrative = narrative.replace(/\[OPTIONS(?: & TYPABLE REFERENCE)?\][\s\S]*?(?=\[SYS:|\n\n\[|$)/i, '');
-  narrative = narrative.replace(/\[OPTIONS(?: & TYPABLE REFERENCE)?\][\s\S]*/i, '');
+  // Remove [OPTIONS & TYPABLE REFERENCE] heading & section
+  narrative = narrative.replace(/(?:#{1,4}\s*)?\[OPTIONS(?: & TYPABLE REFERENCE)?\][\s\S]*?(?=\[SYS:|\[(?:PROGRESSION|XP|CURRENCY|ITEM)|##\s*System State Delta|\n\n\[|$)/i, '');
+  narrative = narrative.replace(/(?:#{1,4}\s*)?\[OPTIONS(?: & TYPABLE REFERENCE)?\][\s\S]*/i, '');
 
   // Remove standalone receipt tags from narrative
-  narrative = narrative.replace(/\[(XP RESOLUTION|CURRENCY RESOLUTION|ITEM RESOLUTION|SYS)[^\]]*\]/gi, '');
+  narrative = narrative.replace(/\[(?:PROGRESSION(?:\/XP)? RESOLUTION|XP RESOLUTION|CURRENCY(?:\/RESOURCE)? RESOLUTION|ITEM RESOLUTION|SYS)[^\]]*\]/gi, '');
 
   // Strip trailing horizontal rules and extra whitespace
   narrative = narrative.replace(/(?:---|\*\*\*)\s*$/gm, '').trim();
@@ -2512,8 +2469,10 @@ function updateShadowNarratorView() {
 }
 
 async function updateShadowTelemetryAndCalibration(campaign) {
+  if (typeof fetch !== 'function') return;
+  const baseUrl = getEngineBaseUrl();
   try {
-    const telRes = await fetch(`http://localhost:8000/telemetry?campaign=${encodeURIComponent(campaign)}`);
+    const telRes = await fetch(`${baseUrl}/telemetry?campaign=${encodeURIComponent(campaign)}`);
     if (telRes.ok) {
       const telData = await telRes.json();
       const summary = telData.summary || {};
@@ -2538,7 +2497,7 @@ async function updateShadowTelemetryAndCalibration(campaign) {
   }
 
   try {
-    const calRes = await fetch(`http://localhost:8000/calibration?campaign=${encodeURIComponent(campaign)}`);
+    const calRes = await fetch(`${baseUrl}/calibration?campaign=${encodeURIComponent(campaign)}`);
     if (calRes.ok) {
       const calData = await calRes.json();
       const calib = calData.calibration || {};
@@ -2704,7 +2663,7 @@ function setupNewCampaignWizard() {
   const newCampBtn = document.getElementById('new-campaign-btn');
   const newCampModal = document.getElementById('new-campaign-modal');
   const cancelBtn = document.getElementById('cancel-new-campaign-btn');
-  const closeBtn = document.getElementById('close-new-campaign-btn');
+  const closeBtn = document.getElementById('close-new-campaign-modal-btn') || document.getElementById('close-new-campaign-btn');
   const form = document.getElementById('new-campaign-form');
 
   if (!newCampBtn || !newCampModal || !form) return;
@@ -2822,3 +2781,4 @@ setupStaticTabListeners();
 setupDockResizer();
 setupNewCampaignWizard();
 setupShadowNarrator();
+loadInitialData();

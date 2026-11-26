@@ -89,6 +89,18 @@ class TestCampaignBuilder(unittest.TestCase):
         self.assertEqual(advice["status"], "success")
         self.assertIn("Shadow Narrator Advisory", advice["advice"])
         self.assertIn("Midnight Spire", advice["advice"])
+        self.assertFalse(advice["posted_to_channel"])
+
+        advice_posted = consult_shadow_narrator(
+            self.test_dir,
+            "test_shadow_camp",
+            "Keep the watch patrols sparse in the courtyard",
+            post_to_channel=True,
+            apply_recal=True
+        )
+        self.assertTrue(advice_posted["posted_to_channel"])
+        self.assertTrue(len(advice_posted["channel_messages"]) >= 1)
+        self.assertIn("[RECAL:", advice_posted["channel_messages"][-1]["content"])
 
     def test_engine_init_campaign_endpoint(self):
         payload = json.dumps({
