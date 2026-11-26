@@ -49,74 +49,158 @@ from ENGINE.style_contract import StyleContractValidator
 from ENGINE.transaction_manager import TransactionManager, TransactionError
 
 PORT = int(os.environ.get("ANTIGRAVITY_PORT", 8000))
+DEFAULT_BIND_HOST = os.environ.get("WHIMSY_HOST") or ("0.0.0.0" if os.path.exists("/.dockerenv") else "127.0.0.1")
 
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 FASTROUTER_CHAT_URL = "https://api.fastrouter.ai/api/v1/chat/completions"
+PUBLIC_BUNDLED_CAMPAIGNS = frozenset({"template_campaign", "sample_campaign"})
+
+
+def _is_safe_http_url(url: str) -> bool:
+    """Allow https:// URLs or loopback http:// URLs only."""
+    from urllib.parse import urlparse
+    parsed = urlparse(url.strip())
+    if parsed.scheme == "https" and bool(parsed.netloc):
+        return True
+    if parsed.scheme == "http" and parsed.hostname in ("localhost", "127.0.0.1", "::1"):
+        return True
+    return False
 
 
 def resolve_llm_config(payload: dict) -> dict:
-    """Resolve provider, API key, model, and base URL from request payload and environment."""
+    """
+    Resolve provider, API key, model, and endpoint URL with strict credential isolation:
+    - Caller-supplied endpoints/providers NEVER receive server environment credentials.
+    - Each server environment key is strictly paired with its own trusted endpoint.
+    """
     payload = payload or {}
-    provider = (
-        payload.get("provider")
-        or os.environ.get("WHIMSY_PROVIDER")
-        or ""
-    ).strip().lower()
-    api_base = (
-        payload.get("apiBaseUrl")
-        or payload.get("api_base_url")
-        or os.environ.get("WHIMSY_API_BASE")
-        or ""
-    ).strip()
-    model = (
-        payload.get("model")
-        or os.environ.get("WHIMSY_MODEL")
-        or ""
-    ).strip()
-    api_key = (
-        payload.get("apiKey")
-        or payload.get("api_key")
-        or os.environ.get("WHIMSY_API_KEY")
-        or os.environ.get("FASTROUTER_API_KEY")
-        or os.environ.get("OPENROUTER_API_KEY")
-        or os.environ.get("GEMINI_API_KEY")
-        or ""
-    ).strip()
+    caller_key = (payload.get("apiKey") or payload.get("api_key") or "").strip()
+    caller_provider = (payload.get("provider") or "").strip().lower()
+    caller_base = (payload.get("apiBaseUrl") or payload.get("api_base_url") or "").strip()
+    caller_model = (payload.get("model") or "").strip()
 
-    if not provider:
-        if model.startswith("fastrouter/") or "fastrouter.ai" in api_base or (
-            os.environ.get("FASTROUTER_API_KEY") and not payload.get("apiKey") and not payload.get("api_key")
-        ):
-            provider = "fastrouter"
-        elif (
-            api_key.startswith("sk-or-")
-            or model.startswith("openrouter/")
-            or "openrouter.ai" in api_base
-            or (os.environ.get("OPENROUTER_API_KEY") and not payload.get("apiKey") and not payload.get("api_key"))
-        ):
-            provider = "openrouter"
-        elif api_base:
-            provider = "custom"
-        elif api_key.startswith("AIza") or (model.startswith("gemini") and "/" not in model):
-            provider = "gemini"
-        elif "/" in model or any(k in model for k in ("claude", "gpt", "llama", "deepseek", "qwen", "mistral")):
-            provider = "openrouter"
-        elif api_key:
-            provider = "openrouter"
+    # Path 1: Caller supplied their own API key
+    if caller_key:
+        if caller_base and not _is_safe_http_url(caller_base):
+            return {
+                "provider": caller_provider or "custom",
+                "api_key": "",
+                "model": caller_model,
+                "api_base": "",
+                "credential_error": "Caller-supplied apiBaseUrl must use https:// or loopback http://.",
+            }
 
-    if provider == "fastrouter" and not model:
-        model = os.environ.get("FASTROUTER_MODEL") or "openai/gpt-4o-mini"
-    elif provider == "openrouter" and not model:
-        model = os.environ.get("OPENROUTER_MODEL") or "anthropic/claude-3.5-sonnet"
-    elif provider == "gemini" and not model:
-        model = "gemini-2.5-flash"
+        provider = caller_provider
+        if not provider:
+            if caller_base:
+                if "fastrouter.ai" in caller_base:
+                    provider = "fastrouter"
+                elif "openrouter.ai" in caller_base:
+                    provider = "openrouter"
+                else:
+                    provider = "custom"
+            elif caller_model.startswith("fastrouter/"):
+                provider = "fastrouter"
+            elif caller_key.startswith("sk-or-") or caller_model.startswith("openrouter/"):
+                provider = "openrouter"
+            elif caller_key.startswith("AIza") or (caller_model.startswith("gemini") and "/" not in caller_model):
+                provider = "gemini"
+            else:
+                provider = "openrouter"
 
-    return {
-        "provider": provider,
-        "api_key": api_key,
-        "model": model,
-        "api_base": api_base,
-    }
+        model = caller_model
+        if provider == "fastrouter" and (not model or model in ("local-antigravity", "local-endpoint")):
+            model = "openai/gpt-4o-mini"
+        elif provider == "openrouter" and (not model or model in ("local-antigravity", "local-endpoint")):
+            model = "anthropic/claude-3.5-sonnet"
+        elif provider == "gemini" and (not model or model in ("local-antigravity", "local-endpoint")):
+            model = "gemini-2.5-flash"
+
+        if provider == "fastrouter":
+            trusted_base = caller_base or FASTROUTER_CHAT_URL
+        elif provider == "openrouter":
+            trusted_base = caller_base or OPENROUTER_CHAT_URL
+        elif provider == "custom":
+            trusted_base = caller_base
+        else:
+            trusted_base = ""
+
+        return {
+            "provider": provider,
+            "api_key": caller_key,
+            "model": model,
+            "api_base": trusted_base,
+        }
+
+    # Path 2: No caller key -> NEVER let caller_base or custom provider steer env secrets
+    if caller_base or caller_provider == "custom":
+        return {
+            "provider": caller_provider or "custom",
+            "api_key": "",
+            "model": caller_model,
+            "api_base": "",
+            "credential_error": "Caller-selected endpoint requires a caller-supplied apiKey.",
+        }
+
+    env_whimsy_key = (os.environ.get("WHIMSY_API_KEY") or "").strip()
+    env_whimsy_provider = (os.environ.get("WHIMSY_PROVIDER") or "").strip().lower()
+    env_whimsy_base = (os.environ.get("WHIMSY_API_BASE") or "").strip()
+    env_fr_key = (os.environ.get("FASTROUTER_API_KEY") or "").strip()
+    env_or_key = (os.environ.get("OPENROUTER_API_KEY") or "").strip()
+    env_gem_key = (os.environ.get("GEMINI_API_KEY") or "").strip()
+    env_model = (os.environ.get("WHIMSY_MODEL") or "").strip()
+
+    # Determine requested or server-default provider without cross-sending keys
+    target_provider = caller_provider or env_whimsy_provider
+    if not target_provider:
+        if caller_model.startswith("fastrouter/") or env_fr_key:
+            target_provider = "fastrouter"
+        elif caller_model.startswith("openrouter/") or env_or_key:
+            target_provider = "openrouter"
+        elif env_whimsy_key and env_whimsy_base:
+            target_provider = "custom"
+        elif env_gem_key:
+            target_provider = "gemini"
+
+    if target_provider == "fastrouter":
+        if not env_fr_key and not (env_whimsy_key and env_whimsy_provider == "fastrouter"):
+            return {"provider": "fastrouter", "api_key": "", "model": caller_model, "api_base": ""}
+        return {
+            "provider": "fastrouter",
+            "api_key": env_fr_key or env_whimsy_key,
+            "model": caller_model or env_model or os.environ.get("FASTROUTER_MODEL") or "openai/gpt-4o-mini",
+            "api_base": FASTROUTER_CHAT_URL,
+        }
+
+    if target_provider == "openrouter":
+        if not env_or_key and not (env_whimsy_key and env_whimsy_provider == "openrouter"):
+            return {"provider": "openrouter", "api_key": "", "model": caller_model, "api_base": ""}
+        return {
+            "provider": "openrouter",
+            "api_key": env_or_key or env_whimsy_key,
+            "model": caller_model or env_model or os.environ.get("OPENROUTER_MODEL") or "anthropic/claude-3.5-sonnet",
+            "api_base": OPENROUTER_CHAT_URL,
+        }
+
+    if target_provider == "gemini":
+        if not env_gem_key and not (env_whimsy_key and env_whimsy_provider == "gemini"):
+            return {"provider": "gemini", "api_key": "", "model": caller_model, "api_base": ""}
+        return {
+            "provider": "gemini",
+            "api_key": env_gem_key or env_whimsy_key,
+            "model": caller_model or env_model or "gemini-2.5-flash",
+            "api_base": "",
+        }
+
+    if target_provider == "custom" and env_whimsy_key and env_whimsy_base and _is_safe_http_url(env_whimsy_base):
+        return {
+            "provider": "custom",
+            "api_key": env_whimsy_key,
+            "model": caller_model or env_model or "gpt-4o-mini",
+            "api_base": env_whimsy_base,
+        }
+
+    return {"provider": target_provider, "api_key": "", "model": caller_model or env_model, "api_base": ""}
 
 
 def _read_text_safe(path: str) -> str:
@@ -136,19 +220,30 @@ def _read_json_safe(path: str):
     return None
 
 
+def _is_campaign_api_allowed(campaign_id: str) -> bool:
+    """Allow public bundled campaigns over CORS HTTP by default; private campaigns require explicit opt-in."""
+    if os.environ.get("WHIMSY_ALLOW_PRIVATE_CAMPAIGN_API") == "1":
+        return True
+    return campaign_id in PUBLIC_BUNDLED_CAMPAIGNS
+
+
 def list_workspace_campaigns(root_dir: str) -> list[dict]:
-    """List campaigns with valid campaign_config.json under CAMPAIGNS/."""
+    """List exposed campaigns with valid campaign_config.json under CAMPAIGNS/."""
     campaigns_dir = os.path.join(root_dir, "CAMPAIGNS")
     items = []
     if not os.path.isdir(campaigns_dir):
         return items
     for name in sorted(os.listdir(campaigns_dir)):
+        if not _is_campaign_api_allowed(name):
+            continue
         cdir = os.path.join(campaigns_dir, name)
         cfg_path = os.path.join(cdir, "campaign_config.json")
         if os.path.isdir(cdir) and os.path.isfile(cfg_path):
             cfg = _read_json_safe(cfg_path)
             if isinstance(cfg, dict):
-                items.append({"id": cfg.get("id", name), "config": cfg})
+                cid = cfg.get("id", name)
+                if _is_campaign_api_allowed(cid):
+                    items.append({"id": cid, "config": cfg})
     return items
 
 
@@ -287,6 +382,10 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
             from urllib.parse import urlparse, parse_qs
             query = parse_qs(urlparse(self.path).query)
             campaign = query.get("campaign", ["template_campaign"])[0]
+            if not _is_campaign_api_allowed(campaign):
+                self._set_cors_headers(403)
+                self.wfile.write(json.dumps({"error": "Private campaign bundle access is disabled over HTTP."}).encode("utf-8"))
+                return
             bundle = load_campaign_bundle(ROOT_DIR, campaign)
             if not bundle:
                 self._set_cors_headers(404)
@@ -393,10 +492,14 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
             if not mode:
                 mode = ModeValidator.get_campaign_mode(campaign, workspace_root)
 
-            # Idempotency token generation & early check for retries
+            should_commit = payload.get("commit", True)
+            if campaign == "template_campaign" and "campaign_dir" not in payload and not payload.get("commit"):
+                should_commit = False
+
+            # Idempotency token generation & early check for retries (skipped when commit is False)
             idempotency_token = TransactionManager.generate_transaction_id(turn_num, player_action)
             committed_record = None
-            if campaign_dir and os.path.isdir(campaign_dir):
+            if should_commit and campaign_dir and os.path.isdir(campaign_dir):
                 committed_record = TransactionManager.get_committed_transaction(
                     campaign_dir=campaign_dir,
                     transaction_id=idempotency_token,
@@ -680,10 +783,14 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
             # =============================================================
             # STEP 4: PERSIST (TransactionManager stages mutations and commits atomically)
             # =============================================================
+            should_commit = payload.get("commit", True)
+            if campaign == "template_campaign" and "campaign_dir" not in payload and not payload.get("commit"):
+                should_commit = False
+
             idempotency_token = TransactionManager.generate_transaction_id(turn_num, player_action)
 
             committed_record = None
-            if campaign_dir and os.path.isdir(campaign_dir):
+            if should_commit and campaign_dir and os.path.isdir(campaign_dir):
                 committed_record = TransactionManager.get_committed_transaction(
                     campaign_dir=campaign_dir,
                     transaction_id=idempotency_token,
@@ -697,10 +804,6 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
                 tx_mgr.current_transaction_id = idempotency_token
                 tx_mgr.current_turn = turn_num
                 tx_mgr.current_action = player_action
-
-                should_commit = payload.get("commit", True)
-                if campaign == "template_campaign" and "campaign_dir" not in payload and not payload.get("commit"):
-                    should_commit = False
 
                 if campaign_dir and os.path.isdir(campaign_dir) and should_commit:
                     # Stage authoritative post-resolution next_state into status.json
@@ -896,6 +999,14 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
                 return
 
             llm_cfg = resolve_llm_config(payload)
+            if llm_cfg.get("credential_error"):
+                self._set_cors_headers(400)
+                self.wfile.write(json.dumps({
+                    "ok": False,
+                    "provider": llm_cfg["provider"],
+                    "error": llm_cfg["credential_error"]
+                }).encode("utf-8"))
+                return
             if not llm_cfg["api_key"]:
                 self._set_cors_headers(200)
                 self.wfile.write(json.dumps({
@@ -1180,9 +1291,9 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
 
 
 def main():
-    server = HTTPServer(("0.0.0.0", PORT), EngineRequestHandler)
+    server = HTTPServer((DEFAULT_BIND_HOST, PORT), EngineRequestHandler)
     print(f"==================================================")
-    print(f" Antigravity Local Engine Server Running on Port {PORT}")
+    print(f" Antigravity Local Engine Server Running on {DEFAULT_BIND_HOST}:{PORT}")
     print(f" Endpoint: http://localhost:{PORT}/generate")
     print(f" Ready to receive CYOA turn requests from UI...")
     print(f"==================================================")
