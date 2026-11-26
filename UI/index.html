@@ -2,11 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#121519">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0d1117">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Whimsy — CYOA Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;0,6..72,700;1,6..72,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" href="icon.png">
@@ -17,14 +20,19 @@
     <!-- Top Bar -->
     <header id="top-bar">
       <div class="header-left">
-        <button id="toggle-sidebar-btn" class="icon-btn" title="Toggle Sidebar">☰</button>
-        <select id="campaign-select" class="campaign-dropdown">
+        <button id="toggle-sidebar-btn" class="icon-btn" title="Toggle Sidebar" aria-label="Toggle Sidebar">
+          <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <select id="campaign-select" class="campaign-dropdown" aria-label="Select Campaign">
           <option value="template_campaign" selected>TEMPLATE CAMPAIGN</option>
         </select>
-        <span id="sync-status" class="status-pill status-indexeddb" title="IndexedDB Offline Storage Active">💾 IndexedDB Active</span>
+        <span id="sync-status" class="status-pill status-indexeddb" title="IndexedDB Offline Storage Active">IndexedDB Active</span>
         <span id="hud-mode-badge" class="hud-badge mode-badge mode-classic" title="Operational Mode">Classic CYOA</span>
         <span id="hud-focus-pill" class="hud-pill focus-pill" title="Narrative Camera Focus / Zoom">Detailed Scene</span>
-        <span id="hud-clock-pill" class="hud-pill clock-pill" title="In-Game Time / Simulation Clock">?? <strong id="val-clock">Day 1, 08:00</strong></span>
+        <span id="hud-clock-pill" class="hud-pill clock-pill" title="In-Game Time / Simulation Clock">
+          <svg class="ui-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+          <strong id="val-clock">Day 1, 08:00</strong>
+        </span>
       </div>
       <div class="header-right" id="top-metrics-container">
         <span class="metric-pill" id="metric-pill-turn">Turn: <strong id="val-turn">—</strong></span>
@@ -33,9 +41,21 @@
         <span class="metric-pill" id="metric-pill-purse">Purse: <strong id="val-purse">—</strong></span>
       </div>
       <div class="header-controls">
-        <button id="new-campaign-btn" class="action-btn secondary" title="Initialize a new campaign universe">✨ New Campaign</button>
-        <button id="folder-picker-btn" class="action-btn">📂 Select Workspace</button>
-        <button id="settings-btn" class="icon-btn" title="Settings / API Key">⚙</button>
+        <button id="help-guide-btn" class="action-btn secondary" title="Open Quick-Start Guide & Architecture Tour" aria-label="Open Quick-Start Guide">
+          <svg class="ui-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <span>Guide</span>
+        </button>
+        <button id="new-campaign-btn" class="action-btn secondary" title="Initialize a new campaign universe">
+          <svg class="ui-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 4.7L19 9.5l-4.2 3.1 1.4 5-4.2-2.7L7.8 17.6l1.4-5L5 9.5l5.1-1.8z"/></svg>
+          <span>New Campaign</span>
+        </button>
+        <button id="folder-picker-btn" class="action-btn" title="Connect local CAMPAIGNS folder for direct disk sync">
+          <svg class="ui-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          <span>Workspace</span>
+        </button>
+        <button id="settings-btn" class="icon-btn" title="Settings & API Key" aria-label="Settings and API Key">
+          <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
       </div>
     </header>
 
@@ -136,11 +156,14 @@
           <div id="shadow-tab" class="tab-pane">
             <div class="shadow-narrator-panel">
               <div class="shadow-header">
-                <div class="shadow-title">🔮 Shadow Narrator</div>
-                <div class="shadow-subtitle">Continuity Guardian & Narrative Compass</div>
+                <div class="shadow-title">
+                  <svg class="ui-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                  <span>Shadow Narrator</span>
+                </div>
+                <div class="shadow-subtitle">Out-of-Character Continuity Guardian &amp; Macro Steerer</div>
               </div>
               <div class="shadow-pacing-card">
-                <div class="shadow-section-label">Active Pacing & Intensity</div>
+                <div class="shadow-section-label">Active Pacing &amp; Intensity</div>
                 <div class="shadow-badges-row">
                   <span class="shadow-badge">Mode: <strong id="shadow-val-mode">Classic CYOA</strong></span>
                   <span class="shadow-badge">Focus: <strong id="shadow-val-zoom">Detailed</strong></span>
@@ -149,7 +172,7 @@
                 </div>
               </div>
               <div class="shadow-section" id="shadow-calibration-card">
-                <div class="shadow-section-label">Agent Calibration & Health</div>
+                <div class="shadow-section-label">Agent Calibration &amp; Health</div>
                 <div class="shadow-badges-row">
                   <span class="shadow-badge" id="shadow-calib-status-badge">Health: <strong id="shadow-calib-status">HEALTHY</strong></span>
                   <span class="shadow-badge">Grounding: <strong id="shadow-calib-grounding">5.0</strong></span>
@@ -158,10 +181,10 @@
                   <span class="shadow-badge">Style: <strong id="shadow-calib-style">5.0</strong></span>
                   <span class="shadow-badge">Steering: <strong id="shadow-calib-steering">5.0</strong></span>
                 </div>
-                <div id="shadow-calibration-advisory" class="shadow-advisory-box hidden" style="margin-top: 8px; font-size: 11px; padding: 6px 10px; background: rgba(255, 171, 0, 0.1); border: 1px solid rgba(255, 171, 0, 0.3); border-radius: 4px; color: #e6b450; white-space: pre-wrap;"></div>
+                <div id="shadow-calibration-advisory" class="shadow-advisory-box hidden"></div>
               </div>
               <div class="shadow-section" id="shadow-telemetry-card">
-                <div class="shadow-section-label">Telemetry & Observability</div>
+                <div class="shadow-section-label">Telemetry &amp; Observability</div>
                 <div class="shadow-badges-row">
                   <span class="shadow-badge">Total Turns: <strong id="shadow-telemetry-turns">0</strong></span>
                   <span class="shadow-badge">Avg Latency: <strong id="shadow-telemetry-latency">0ms</strong></span>
@@ -170,19 +193,40 @@
                 </div>
               </div>
               <div class="shadow-section">
-                <div class="shadow-section-label">Narrative Steering & Objectives</div>
-                <div id="shadow-steering-render" class="markdown-body">
-                  <div class="empty-hint">Loading campaign narrative steering...</div>
+                <div class="shadow-section-label">Inter-Agent Channel (<code>agent_channel.md</code>)</div>
+                <div id="shadow-channel-feed" class="shadow-channel-feed">
+                  <div class="empty-hint">No channel directives recorded yet.</div>
                 </div>
               </div>
               <div class="shadow-consult-box">
-                <div class="shadow-section-label">Consult Shadow Narrator</div>
-                <p class="shadow-hint">Request pacing calibration, check unaddressed plot threads, or inject continuity constraints:</p>
+                <div class="shadow-section-label">Instruct or Consult Shadow Narrator</div>
+                <p class="shadow-hint">Ask out-of-character for a continuity audit, or send a steering directive to the Active GM for the next turn:</p>
+                <div class="shadow-presets">
+                  <button type="button" class="shadow-preset-chip" data-preset="Audit the recent turns for prose drift, pacing consistency, and clock parity.">Audit Drift</button>
+                  <button type="button" class="shadow-preset-chip" data-preset="Slow the pace down for the next scene and focus on tense, quiet NPC dialogue.">Slow &amp; Grounded</button>
+                  <button type="button" class="shadow-preset-chip" data-preset="Introduce a complication from a rival faction watching the protagonist's route.">Add Rival Pressure</button>
+                </div>
                 <div class="shadow-input-row">
-                  <input type="text" id="shadow-query-input" placeholder="e.g. Advise on pacing for the upcoming faction trial..." />
-                  <button id="shadow-consult-btn" class="action-btn primary">Consult</button>
+                  <input type="text" id="shadow-query-input" placeholder="e.g. Have the harbor clerk recognize the seal and stall for time..." aria-label="Shadow Narrator instruction or query" />
+                  <button id="shadow-consult-btn" class="action-btn primary">Consult &amp; Steer</button>
+                </div>
+                <div class="shadow-toggles-row">
+                  <label class="inline-check">
+                    <input type="checkbox" id="shadow-post-channel-toggle" checked />
+                    <span>Send directive to Active GM channel</span>
+                  </label>
+                  <label class="inline-check">
+                    <input type="checkbox" id="shadow-apply-recal-toggle" />
+                    <span>Also attach [RECAL] tag</span>
+                  </label>
                 </div>
                 <div id="shadow-consult-result" class="shadow-result-box hidden"></div>
+              </div>
+              <div class="shadow-section">
+                <div class="shadow-section-label">Narrative Steering &amp; Arc Compass</div>
+                <div id="shadow-steering-render" class="markdown-body">
+                  <div class="empty-hint">Loading campaign narrative steering...</div>
+                </div>
               </div>
             </div>
           </div>
@@ -192,6 +236,16 @@
 
       <!-- Narrative Viewport -->
       <main id="story-viewport">
+        <div id="quickstart-strip" class="quickstart-strip hidden">
+          <div class="quickstart-strip-text">
+            <strong>New to Whimsy?</strong> Pick a numbered option below or connect your OpenRouter / FastRouter key for live LLM prose and Shadow Narrator steering.
+          </div>
+          <div class="quickstart-strip-actions">
+            <button type="button" id="qs-open-settings-btn" class="action-btn small primary">Configure API Key</button>
+            <button type="button" id="qs-open-guide-btn" class="action-btn small">How It Works</button>
+            <button type="button" id="qs-dismiss-btn" class="icon-btn-small" title="Dismiss banner" aria-label="Dismiss quickstart banner">✕</button>
+          </div>
+        </div>
         <div id="story-stream">
           <!-- Welcome Initial Card -->
           <div class="scene-card welcome-card">
@@ -333,56 +387,181 @@
       </div>
     </div>
 
+    <!-- First-Time Onboarding & Usage Guide Modal -->
+    <div id="onboarding-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+      <div class="modal-content onboarding-modal-content">
+        <div class="modal-header">
+          <div>
+            <span class="onboarding-eyebrow">WHIMSY CYOA ENGINE</span>
+            <h3 id="onboarding-title">Welcome to Your Interactive Story Engine</h3>
+          </div>
+          <button id="close-onboarding-btn" class="icon-btn" title="Close Guide" aria-label="Close Guide">✕</button>
+        </div>
+
+        <div class="onboarding-tabs" role="tablist">
+          <button type="button" class="onboarding-tab active" data-step="1">1. Story Engine</button>
+          <button type="button" class="onboarding-tab" data-step="2">2. Keys &amp; Local Run</button>
+          <button type="button" class="onboarding-tab" data-step="3">3. Play &amp; Shadow GM</button>
+        </div>
+
+        <div class="onboarding-step active" data-step-panel="1">
+          <p class="onboarding-lead">Whimsy separates <strong>deterministic game rules</strong> (clocks, inventory, funds, state) from <strong>AI narration</strong>, so nothing gets hallucinated or lost.</p>
+          <div class="onboarding-cards">
+            <div class="onboarding-card">
+              <div class="onboarding-card-title">Living Dual State</div>
+              <p>Every turn updates structured JSON and human-readable Markdown side by side, synced in the left sidebar.</p>
+            </div>
+            <div class="onboarding-card">
+              <div class="onboarding-card-title">World Bible &amp; Epistemic Seal</div>
+              <p>Canon lore, factions, lineages, and NPC knowledge boundaries live in modular files—never one giant prompt.</p>
+            </div>
+            <div class="onboarding-card">
+              <div class="onboarding-card-title">Style Contract Guard</div>
+              <p>Built-in linting enforces grounded, natural English and prevents repetitive clichés or jargon drift.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="onboarding-step" data-step-panel="2">
+          <p class="onboarding-lead">Run Whimsy 100% offline, via your local Python server, or straight from the browser with <strong>OpenRouter</strong>, <strong>FastRouter</strong>, or <strong>Gemini</strong>.</p>
+          <div class="onboarding-cards">
+            <div class="onboarding-card">
+              <div class="onboarding-card-title">Tier 1 — Instant Offline</div>
+              <p>Zero setup, zero API key. Uses deterministic core + authored prose with IndexedDB saves.</p>
+            </div>
+            <div class="onboarding-card highlight">
+              <div class="onboarding-card-title">Tier 2 — Local Engine (Recommended)</div>
+              <p>Run <code>python ENGINE/engine.py</code> locally with your OpenRouter or FastRouter key. Persists turns to disk, validates style, and powers Shadow GM.</p>
+            </div>
+            <div class="onboarding-card">
+              <div class="onboarding-card-title">Tier 3 — Browser Direct</div>
+              <p>Paste your OpenRouter (<code>sk-or-...</code>), FastRouter, or Gemini key in Settings for serverless cloud play.</p>
+            </div>
+          </div>
+          <div class="onboarding-inline-cta">
+            <button type="button" id="onboarding-open-settings-btn" class="action-btn primary">Configure API Key &amp; Provider</button>
+          </div>
+        </div>
+
+        <div class="onboarding-step" data-step-panel="3">
+          <p class="onboarding-lead">Drive the story from the bottom dock and steer macro pacing out-of-character anytime using the <strong>Shadow GM</strong> tab.</p>
+          <div class="onboarding-cards">
+            <div class="onboarding-card">
+              <div class="onboarding-card-title">Choices &amp; [RECAL] Nuance</div>
+              <p>Click a choice (or press keys <code>1</code>–<code>4</code>), optionally add a tactical/tone constraint in the <strong>RECALIBRATION</strong> box, and press <strong>Execute Choice</strong>.</p>
+            </div>
+            <div class="onboarding-card">
+              <div class="onboarding-card-title">Talk to Shadow Narrator</div>
+              <p>Open the <strong>Shadow GM</strong> tab to audit recent turns, check calibration scores, and send live directives via <code>agent_channel.md</code>.</p>
+            </div>
+            <div class="onboarding-card">
+              <div class="onboarding-card-title">Time-Travel &amp; Receipts</div>
+              <p>Browse earlier turns with <strong>Previous / Next Turn</strong> and inspect exact arithmetic deltas inside the collapsible receipts drawer.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="onboarding-footer">
+          <label class="inline-check">
+            <input type="checkbox" id="onboarding-dont-show-checkbox" />
+            <span>Don't show automatically on startup</span>
+          </label>
+          <div class="onboarding-footer-actions">
+            <button type="button" id="onboarding-skip-btn" class="action-btn">Skip Tour</button>
+            <button type="button" id="onboarding-next-btn" class="action-btn primary">Next</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Settings Modal -->
-    <div id="settings-modal" class="modal-overlay hidden">
-      <div class="modal-content">
-        <h3>Campaign & Model Settings</h3>
+    <div id="settings-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
+      <div class="modal-content settings-modal-content">
+        <div class="modal-header">
+          <h3 id="settings-modal-title">Campaign &amp; Model Settings</h3>
+          <button id="close-settings-x-btn" class="icon-btn" title="Close" aria-label="Close settings">✕</button>
+        </div>
         <label>
           Narration Engine Tier:
           <select id="narration-tier-select">
             <option value="1" selected>Tier 1: Authored / Offline (Zero network, 100% keyless, instant)</option>
-            <option value="2">Tier 2: Local Model (In-browser WebGPU/WASM or local endpoint)</option>
-            <option value="3">Tier 3: Cloud LLM (BYO API key via OpenRouter or Gemini)</option>
+            <option value="2">Tier 2: Local Python Engine (http://localhost:8000 + disk sync + optional key)</option>
+            <option value="3">Tier 3: Browser Cloud LLM (Direct BYO API key: OpenRouter / FastRouter / Gemini)</option>
           </select>
         </label>
-        <label id="gemini-key-label">
-          API Key <small style="color:var(--gold-dim)">(OpenRouter sk-or-... or Gemini AIzaSy...)</small>:
-          <input type="password" id="gemini-api-key" placeholder="sk-or-v1-... or AIzaSy... (optional for local)" />
-        </label>
-        <label>
-          Prose Length / Pacing:
-          <select id="pacing-select">
-            <option value="concise">Concise (1–2 punchy paragraphs, fast scene tempo)</option>
-            <option value="standard" selected>Standard (2–3 balanced, high-sensory paragraphs)</option>
-            <option value="expansive">Expansive (Full multi-paragraph scene & deep NPC dialogue)</option>
-          </select>
-        </label>
-        <label>
-          Model Target:
-          <select id="gemini-model-select">
-            <option value="local-antigravity" selected>Local Antigravity (Local Engine / Agent Bridge)</option>
-            <option value="openrouter/anthropic/claude-3.5-sonnet">OpenRouter: Claude 3.5 Sonnet</option>
-            <option value="openrouter/google/gemini-2.5-flash">OpenRouter: Gemini 2.5 Flash</option>
-            <option value="openrouter/meta-llama/llama-3.3-70b-instruct">OpenRouter: Llama 3.3 70B Instruct</option>
-            <option value="openrouter/deepseek/deepseek-chat">OpenRouter: DeepSeek Chat</option>
-            <option value="gemini-2.5-flash">Gemini 2.5 Flash (Direct Cloud)</option>
-            <option value="gemini-2.5-pro">Gemini 2.5 Pro (Direct Cloud)</option>
-            <option value="local-endpoint">Custom Local Endpoint (Ollama / vLLM / LM Studio)</option>
-          </select>
-        </label>
-        <div id="local-endpoint-group" style="margin-top: 4px;">
+        <div class="form-row">
           <label>
-            Local Endpoint URL:
+            Cloud Provider:
+            <select id="provider-select">
+              <option value="auto" selected>Auto-detect (from key or model)</option>
+              <option value="openrouter">OpenRouter (openrouter.ai)</option>
+              <option value="fastrouter">FastRouter (api.fastrouter.ai)</option>
+              <option value="gemini">Google Gemini (Direct)</option>
+              <option value="custom">Custom OpenAI-Compatible URL</option>
+            </select>
+          </label>
+          <label>
+            Prose Length / Pacing:
+            <select id="pacing-select">
+              <option value="concise">Concise (1–2 punchy paragraphs)</option>
+              <option value="standard" selected>Standard (2–3 balanced paragraphs)</option>
+              <option value="expansive">Expansive (Rich multi-paragraph detail)</option>
+            </select>
+          </label>
+        </div>
+        <label id="gemini-key-label">
+          API Key <small class="field-hint">(OpenRouter, FastRouter, or Gemini — stored only in browser localStorage)</small>:
+          <div class="input-with-action">
+            <input type="password" id="gemini-api-key" placeholder="sk-or-v1-... / FastRouter key / AIzaSy..." autocomplete="off" />
+            <button type="button" id="toggle-api-key-vis" class="action-btn small" title="Show or hide API key">Show</button>
+          </div>
+        </label>
+        <div class="form-row">
+          <label>
+            Model Target:
+            <select id="gemini-model-select">
+              <option value="local-antigravity" selected>Local Antigravity (Engine Default / Env Key)</option>
+              <option value="openrouter/anthropic/claude-3.5-sonnet">OpenRouter: Claude 3.5 Sonnet</option>
+              <option value="openrouter/google/gemini-2.5-flash">OpenRouter: Gemini 2.5 Flash</option>
+              <option value="openrouter/meta-llama/llama-3.3-70b-instruct">OpenRouter: Llama 3.3 70B Instruct</option>
+              <option value="openrouter/deepseek/deepseek-chat">OpenRouter: DeepSeek Chat</option>
+              <option value="fastrouter/openai/gpt-4o-mini">FastRouter: GPT-4o Mini</option>
+              <option value="fastrouter/anthropic/claude-3.5-sonnet">FastRouter: Claude 3.5 Sonnet</option>
+              <option value="fastrouter/google/gemini-2.5-flash">FastRouter: Gemini 2.5 Flash</option>
+              <option value="gemini-2.5-flash">Gemini 2.5 Flash (Direct Cloud)</option>
+              <option value="gemini-2.5-pro">Gemini 2.5 Pro (Direct Cloud)</option>
+              <option value="local-endpoint">Custom Local Endpoint (Ollama / vLLM / LM Studio)</option>
+            </select>
+          </label>
+          <label>
+            Custom Model ID <small class="field-hint">(optional override)</small>:
+            <input type="text" id="custom-model-input" placeholder="e.g. anthropic/claude-3.7-sonnet" />
+          </label>
+        </div>
+        <div id="api-base-group">
+          <label>
+            Custom API Base URL <small class="field-hint">(optional; auto-set for OpenRouter / FastRouter)</small>:
+            <input type="text" id="api-base-url" placeholder="https://api.fastrouter.ai/api/v1/chat/completions" />
+          </label>
+        </div>
+        <div id="local-endpoint-group">
+          <label>
+            Local Engine Endpoint URL:
             <input type="text" id="local-endpoint-url" placeholder="http://localhost:8000/generate" value="http://localhost:8000/generate" />
           </label>
         </div>
-        <div class="save-management-row" style="margin-top: 12px; margin-bottom: 8px; display: flex; gap: 8px;">
-          <button id="export-save-btn" type="button" class="action-btn" title="Export campaign save file as JSON">💾 Export Save JSON</button>
-          <button id="import-save-btn" type="button" class="action-btn" title="Import campaign save file">📥 Import Save JSON</button>
+        <div id="tier-key-hint" class="settings-hint-box hidden"></div>
+        <div class="connection-test-row">
+          <button type="button" id="test-connection-btn" class="action-btn small">Test Connection</button>
+          <span id="connection-test-result" class="connection-status-text"></span>
+        </div>
+        <div class="save-management-row">
+          <button id="export-save-btn" type="button" class="action-btn" title="Export campaign save file as JSON">Export Save JSON</button>
+          <button id="import-save-btn" type="button" class="action-btn" title="Import campaign save file">Import Save JSON</button>
           <input type="file" id="import-save-file" accept=".json" style="display: none;" />
         </div>
         <div class="modal-actions">
-          <button id="save-settings-btn" class="action-btn primary">Save & Close</button>
+          <button id="save-settings-btn" class="action-btn primary">Save &amp; Close</button>
           <button id="close-settings-btn" class="action-btn">Cancel</button>
         </div>
       </div>
