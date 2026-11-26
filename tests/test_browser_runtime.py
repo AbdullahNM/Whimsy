@@ -86,12 +86,18 @@ class TestBrowserRuntimeStaticBundle(unittest.TestCase):
             self.assertGreater(pos, last_pos, f"Script loaded out of order: {script}")
             last_pos = pos
 
-        # Check UI elements for Issue #17
+        # Check UI elements for Issue #17 and Issue #56
         self.assertIn('id="sync-status"', html)
         self.assertIn('status-indexeddb', html)
         self.assertIn('id="narration-tier-select"', html)
         self.assertIn('id="export-save-btn"', html)
         self.assertIn('id="import-save-btn"', html)
+        self.assertIn('id="onboarding-modal"', html)
+        self.assertIn('id="help-guide-btn"', html)
+        self.assertIn('id="provider-select"', html)
+        self.assertIn('fastrouter/openai/gpt-4o-mini', html)
+        self.assertIn('id="shadow-channel-feed"', html)
+        self.assertNotIn('user-scalable=no', html)
 
     def test_mobile_touch_targets_and_responsive_css(self):
         """Verify styles.css enforces WCAG minimum touch targets (44px) and mobile landscape rules."""

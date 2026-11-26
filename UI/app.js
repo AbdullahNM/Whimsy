@@ -393,18 +393,18 @@ async function loadInitialData() {
           syncStatus.title = 'Workspace connected';
           await loadWorkspace(storedHandle);
         } else {
-          syncStatus.textContent = `⚡ Reconnect: ${storedHandle.name}`;
+          syncStatus.textContent = `Reconnect: ${storedHandle.name}`;
           syncStatus.className = 'status-pill status-reconnect';
           syncStatus.title = 'Click to re-authorize workspace folder access';
         }
       } catch (err) {
-        syncStatus.textContent = `⚡ Reconnect: ${storedHandle.name}`;
+        syncStatus.textContent = `Reconnect: ${storedHandle.name}`;
         syncStatus.className = 'status-pill status-reconnect';
         syncStatus.title = 'Click to re-authorize workspace folder access';
       }
       }
     } else {
-      syncStatus.textContent = '💾 IndexedDB Active';
+      syncStatus.textContent = 'IndexedDB Active';
       syncStatus.className = 'status-pill status-indexeddb';
       syncStatus.title = 'IndexedDB Offline Storage Active (Zero Backend Required)';
     }
@@ -1299,23 +1299,40 @@ function renderIdeas(narrativeSteering = '', upcomingHooks = '') {
 const settingsBtn = document.getElementById('settings-btn');
 const settingsModal = document.getElementById('settings-modal');
 const closeSettingsBtn = document.getElementById('close-settings-btn');
+const closeSettingsXBtn = document.getElementById('close-settings-x-btn');
 const saveSettingsBtn = document.getElementById('save-settings-btn');
 const apiKeyInput = document.getElementById('gemini-api-key');
+const toggleApiKeyVisBtn = document.getElementById('toggle-api-key-vis');
+const providerSelect = document.getElementById('provider-select');
 const pacingSelect = document.getElementById('pacing-select');
 const modelSelect = document.getElementById('gemini-model-select');
+const customModelInput = document.getElementById('custom-model-input');
+const apiBaseInput = document.getElementById('api-base-url');
 const maxTurnsInput = document.getElementById('max-turns-input');
 const localEndpointInput = document.getElementById('local-endpoint-url');
 const localEndpointGroup = document.getElementById('local-endpoint-group');
+const tierKeyHint = document.getElementById('tier-key-hint');
+const testConnBtn = document.getElementById('test-connection-btn');
+const testConnResult = document.getElementById('connection-test-result');
 
 // Load stored settings
-if (localStorage.getItem('gemini_api_key')) {
+if (localStorage.getItem('gemini_api_key') && apiKeyInput) {
   apiKeyInput.value = localStorage.getItem('gemini_api_key');
 }
-if (localStorage.getItem('cyoa_pacing')) {
+if (localStorage.getItem('cyoa_provider') && providerSelect) {
+  providerSelect.value = localStorage.getItem('cyoa_provider');
+}
+if (localStorage.getItem('cyoa_pacing') && pacingSelect) {
   pacingSelect.value = localStorage.getItem('cyoa_pacing');
 }
 if (localStorage.getItem('cyoa_model') && modelSelect) {
   modelSelect.value = localStorage.getItem('cyoa_model');
+}
+if (localStorage.getItem('cyoa_custom_model') && customModelInput) {
+  customModelInput.value = localStorage.getItem('cyoa_custom_model');
+}
+if (localStorage.getItem('cyoa_api_base') && apiBaseInput) {
+  apiBaseInput.value = localStorage.getItem('cyoa_api_base');
 }
 if (localStorage.getItem('cyoa_local_endpoint') && localEndpointInput) {
   localEndpointInput.value = localStorage.getItem('cyoa_local_endpoint');
@@ -1324,45 +1341,170 @@ if (localStorage.getItem('cyoa_max_turns') && maxTurnsInput) {
   maxTurnsInput.value = localStorage.getItem('cyoa_max_turns');
 }
 
+function getEffectiveModel() {
+  const custom = customModelInput && customModelInput.value ? customModelInput.value.trim() : '';
+  if (custom) return custom;
+  if (modelSelect && modelSelect.value) return modelSelect.value;
+  return localStorage.getItem('cyoa_custom_model') || localStorage.getItem('cyoa_model') || 'local-antigravity';
+}
+
+function getEffectiveProvider() {
+  const p = providerSelect && providerSelect.value ? providerSelect.value : (localStorage.getItem('cyoa_provider') || 'auto');
+  return p === 'auto' ? '' : p;
+}
+
+function updateTierKeyHint() {
+  if (!tierKeyHint) return;
+  const tierEl = document.getElementById('narration-tier-select');
+  const tierVal = tierEl ? tierEl.value : '1';
+  const rawKey = (apiKeyInput && typeof apiKeyInput.value === 'string') ? apiKeyInput.value.trim() : '';
+  const hasKey = rawKey.length > 5;
+  if (hasKey && tierVal === '1') {
+    tierKeyHint.classList?.remove('hidden');
+    tierKeyHint.innerHTML = '<span>You entered an API key, but Tier 1 (Offline) is selected. Switch to Tier 2 (Local Engine) or Tier 3 (Browser Cloud) to use it.</span>'
+      + '<button type="button" id="quick-switch-tier2-btn" class="action-btn small primary">Use Tier 2</button>';
+    const swBtn = document.getElementById('quick-switch-tier2-btn');
+    if (swBtn && tierEl) {
+      swBtn.addEventListener('click', () => {
+        tierEl.value = '2';
+        updateTierKeyHint();
+      });
+    }
+  } else {
+    tierKeyHint.classList?.add('hidden');
+  }
+}
+
 function updateModelSettingsVisibility() {
   if (!modelSelect || !localEndpointGroup) return;
-  const isLocal = modelSelect.value === 'local-antigravity' || modelSelect.value === 'local-endpoint';
+  const tierEl = document.getElementById('narration-tier-select');
+  const isLocal = !tierEl || tierEl.value === '2' || modelSelect.value === 'local-antigravity' || modelSelect.value === 'local-endpoint';
   localEndpointGroup.style.display = isLocal ? 'block' : 'none';
+  updateTierKeyHint();
 }
 if (modelSelect) {
   modelSelect.addEventListener('change', updateModelSettingsVisibility);
   updateModelSettingsVisibility();
 }
+if (apiKeyInput) {
+  apiKeyInput.addEventListener('input', updateTierKeyHint);
+}
+if (toggleApiKeyVisBtn && apiKeyInput) {
+  toggleApiKeyVisBtn.addEventListener('click', () => {
+    const hidden = apiKeyInput.type === 'password';
+    apiKeyInput.type = hidden ? 'text' : 'password';
+    toggleApiKeyVisBtn.textContent = hidden ? 'Hide' : 'Show';
+  });
+}
 
-settingsBtn.addEventListener('click', () => {
-  updateModelSettingsVisibility();
-  settingsModal.classList.remove('hidden');
-});
-closeSettingsBtn.addEventListener('click', () => settingsModal.classList.add('hidden'));
-saveSettingsBtn.addEventListener('click', () => {
-  localStorage.setItem('gemini_api_key', apiKeyInput.value.trim());
-  localStorage.setItem('cyoa_pacing', pacingSelect.value);
-  if (modelSelect) {
-    localStorage.setItem('cyoa_model', modelSelect.value);
-  }
-  if (localEndpointInput) {
-    localStorage.setItem('cyoa_local_endpoint', localEndpointInput.value.trim());
-  }
-  if (maxTurnsInput) {
-    localStorage.setItem('cyoa_max_turns', maxTurnsInput.value);
-  }
-  const tierElem = document.getElementById('narration-tier-select');
-  if (tierElem) {
-    localStorage.setItem('cyoa_narration_tier', tierElem.value);
-  }
-  settingsModal.classList.add('hidden');
-});
+if (settingsBtn) {
+  settingsBtn.addEventListener('click', () => {
+    updateModelSettingsVisibility();
+    if (testConnResult) {
+      testConnResult.textContent = '';
+      testConnResult.className = 'connection-status-text';
+    }
+    settingsModal?.classList?.remove('hidden');
+  });
+}
+if (closeSettingsBtn) closeSettingsBtn.addEventListener('click', () => settingsModal?.classList?.add('hidden'));
+if (closeSettingsXBtn) closeSettingsXBtn.addEventListener('click', () => settingsModal?.classList?.add('hidden'));
+if (saveSettingsBtn) {
+  saveSettingsBtn.addEventListener('click', () => {
+    const trimmedKey = (apiKeyInput && typeof apiKeyInput.value === 'string') ? apiKeyInput.value.trim() : '';
+    localStorage.setItem('gemini_api_key', trimmedKey);
+    if (providerSelect) localStorage.setItem('cyoa_provider', providerSelect.value);
+    if (pacingSelect) localStorage.setItem('cyoa_pacing', pacingSelect.value);
+    if (modelSelect) localStorage.setItem('cyoa_model', modelSelect.value);
+    if (customModelInput) localStorage.setItem('cyoa_custom_model', (customModelInput.value || '').trim());
+    if (apiBaseInput) localStorage.setItem('cyoa_api_base', (apiBaseInput.value || '').trim());
+    if (localEndpointInput) localStorage.setItem('cyoa_local_endpoint', (localEndpointInput.value || '').trim());
+    if (maxTurnsInput) localStorage.setItem('cyoa_max_turns', maxTurnsInput.value);
+
+    const tierElem = document.getElementById('narration-tier-select');
+    if (tierElem) {
+      localStorage.setItem('cyoa_narration_tier', tierElem.value);
+    }
+    settingsModal?.classList?.add('hidden');
+    if (trimmedKey) {
+      const qsStrip = document.getElementById('quickstart-strip');
+      if (qsStrip) qsStrip.classList?.add('hidden');
+    }
+    showToast('Settings saved.', 'success', 2500);
+  });
+}
+
+if (testConnBtn && typeof fetch === 'function') {
+  testConnBtn.addEventListener('click', async () => {
+    if (!testConnResult) return;
+    testConnBtn.disabled = true;
+    testConnResult.className = 'connection-status-text';
+    testConnResult.textContent = 'Testing connection...';
+    const key = apiKeyInput ? apiKeyInput.value.trim() : '';
+    const model = getEffectiveModel();
+    const provider = getEffectiveProvider();
+    const apiBaseUrl = apiBaseInput ? apiBaseInput.value.trim() : '';
+    const tierEl = document.getElementById('narration-tier-select');
+    const tierVal = tierEl ? tierEl.value : '1';
+
+    try {
+      if (tierVal === '2' || (!key && tierVal !== '3')) {
+        const res = await fetch(`${getEngineBaseUrl()}/api/test_connection`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ apiKey: key, provider, model, apiBaseUrl })
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          testConnResult.className = 'connection-status-text ok';
+          testConnResult.textContent = data.message || 'Connected!';
+        } else {
+          throw new Error(data.error || `HTTP ${res.status}`);
+        }
+      } else if (key && window.cloudNarrator) {
+        const prov = window.cloudNarrator._resolveProvider(key, model, provider || null, apiBaseUrl || null);
+        if (prov === 'gemini') {
+          const cleanM = (model || 'gemini-2.5-flash').split('/').pop();
+          const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${cleanM}:generateContent?key=${key}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [{ text: 'Reply with OK.' }] }] })
+          });
+          if (!r.ok) throw new Error(`Gemini HTTP ${r.status}`);
+        } else {
+          const url = apiBaseUrl || (prov === 'fastrouter' ? 'https://api.fastrouter.ai/api/v1/chat/completions' : 'https://openrouter.ai/api/v1/chat/completions');
+          let actualM = model.replace(/^(openrouter|fastrouter)\//, '');
+          if (actualM === 'local-antigravity' || actualM === 'local-endpoint') {
+            actualM = prov === 'fastrouter' ? 'openai/gpt-4o-mini' : 'anthropic/claude-3.5-sonnet';
+          }
+          const r = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+            body: JSON.stringify({ model: actualM, messages: [{ role: 'user', content: 'Reply with OK.' }], max_tokens: 12 })
+          });
+          if (!r.ok) throw new Error(`${prov} HTTP ${r.status}`);
+        }
+        testConnResult.className = 'connection-status-text ok';
+        testConnResult.textContent = `Connected directly to ${prov}!`;
+      } else {
+        testConnResult.className = 'connection-status-text ok';
+        testConnResult.textContent = 'Tier 1 Offline mode ready (no key needed).';
+      }
+    } catch (err) {
+      testConnResult.className = 'connection-status-text err';
+      testConnResult.textContent = `Failed: ${err.message}`;
+    } finally {
+      testConnBtn.disabled = false;
+    }
+  });
+}
 
 // Load stored narration tier
 const narrationTierSelect = document.getElementById('narration-tier-select');
 if (narrationTierSelect) {
   const storedTier = localStorage.getItem('cyoa_narration_tier');
   if (storedTier) narrationTierSelect.value = storedTier;
+  narrationTierSelect.addEventListener('change', updateModelSettingsVisibility);
 }
 
 // Save Management: Export Save JSON
@@ -1596,9 +1738,9 @@ async function executeTurnAction(choiceNum, choiceText) {
   try {
     const pacing = localStorage.getItem('cyoa_pacing') || 'standard';
     const apiKey = (apiKeyInput && apiKeyInput.value.trim()) || localStorage.getItem('gemini_api_key') || '';
-    const selectedModel = modelSelect ? modelSelect.value : (localStorage.getItem('cyoa_model') || 'local-antigravity');
-    const selectedProvider = localStorage.getItem('cyoa_provider') || '';
-    const apiBaseUrl = localStorage.getItem('cyoa_api_base') || '';
+    const selectedModel = typeof getEffectiveModel === 'function' ? getEffectiveModel() : (modelSelect ? modelSelect.value : 'local-antigravity');
+    const selectedProvider = typeof getEffectiveProvider === 'function' ? getEffectiveProvider() : (localStorage.getItem('cyoa_provider') || '');
+    const apiBaseUrl = (apiBaseInput && apiBaseInput.value.trim()) || localStorage.getItem('cyoa_api_base') || '';
     const localEndpoint = (localEndpointInput && localEndpointInput.value.trim()) || localStorage.getItem('cyoa_local_endpoint') || 'http://localhost:8000/generate';
 
     const activeCfg = campaignConfigs[selectedCampaign] || activeConfig || {};
@@ -2433,6 +2575,48 @@ function appendCard(header, htmlContent, isPlayer = false) {
 
 
 // Shadow Narrator View & Consultation Handler
+function renderShadowChannelFeed(messages) {
+  const feedEl = document.getElementById('shadow-channel-feed');
+  if (!feedEl) return;
+  const list = Array.isArray(messages) ? messages : [];
+  if (list.length === 0) {
+    feedEl.innerHTML = '<div class="empty-hint">No channel directives recorded yet. Send a directive below to steer the Active GM.</div>';
+    return;
+  }
+  feedEl.innerHTML = list.map(m => {
+    const sender = String(m.sender || 'SHADOW').toUpperCase();
+    const recipient = String(m.recipient || (sender === 'SHADOW' ? 'ACTIVE' : 'SHADOW')).toUpperCase();
+    const isFromActive = sender === 'ACTIVE';
+    const turnLabel = m.turn !== undefined && m.turn !== null ? `Turn ${m.turn}` : 'Live';
+    return `
+      <div class="channel-msg ${isFromActive ? 'from-active' : 'from-shadow'}">
+        <div class="channel-msg-meta">
+          <span>${escapeHtml(sender)} &rarr; ${escapeHtml(recipient)}</span>
+          <span>${escapeHtml(turnLabel)}</span>
+        </div>
+        <div class="channel-msg-body">${escapeHtml(m.content || '')}</div>
+      </div>
+    `;
+  }).join('');
+  feedEl.scrollTop = feedEl.scrollHeight;
+}
+
+async function refreshShadowChannel(campaign) {
+  if (typeof fetch !== 'function') return;
+  try {
+    const res = await fetch(`${getEngineBaseUrl()}/api/channel?campaign=${encodeURIComponent(campaign)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.messages)) {
+        campaignData.agentChannel = data.messages;
+        renderShadowChannelFeed(campaignData.agentChannel);
+      }
+    }
+  } catch (e) {
+    // Engine offline; use in-memory channel
+  }
+}
+
 function updateShadowNarratorView() {
   const statusJson = campaignData.statusJson || {};
   const pacingState = statusJson.pacing_state || {};
@@ -2464,7 +2648,10 @@ function updateShadowNarratorView() {
     renderEl.innerHTML = renderMarkdown(steering);
   }
 
+  renderShadowChannelFeed(campaignData.agentChannel);
+
   const campaign = campaignSelect ? campaignSelect.value : 'template_campaign';
+  refreshShadowChannel(campaign);
   updateShadowTelemetryAndCalibration(campaign);
 }
 
@@ -2541,25 +2728,62 @@ function setupShadowNarrator() {
   const consultBtn = document.getElementById('shadow-consult-btn');
   const queryInput = document.getElementById('shadow-query-input');
   const resultBox = document.getElementById('shadow-consult-result');
+  const postToggle = document.getElementById('shadow-post-channel-toggle');
+  const recalToggle = document.getElementById('shadow-apply-recal-toggle');
+
+  document.querySelectorAll('.shadow-preset-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      if (queryInput) {
+        queryInput.value = chip.dataset.preset || chip.textContent.trim();
+        queryInput.focus();
+      }
+    });
+  });
 
   async function handleConsult() {
     if (!queryInput || !resultBox) return;
     const query = queryInput.value.trim();
     if (!query) return;
 
-    resultBox.classList.remove('hidden');
+    const postToChannel = postToggle ? Boolean(postToggle.checked) : true;
+    const applyRecal = recalToggle ? Boolean(recalToggle.checked) : false;
+
+    resultBox.classList?.remove('hidden');
     resultBox.innerHTML = '<em>Consulting Shadow Narrator...</em>';
+    if (consultBtn) consultBtn.disabled = true;
 
     const campaign = campaignSelect ? campaignSelect.value : 'template_campaign';
+    const apiKey = (apiKeyInput && apiKeyInput.value.trim()) || localStorage.getItem('gemini_api_key') || '';
+    const model = typeof getEffectiveModel === 'function' ? getEffectiveModel() : '';
+    const provider = typeof getEffectiveProvider === 'function' ? getEffectiveProvider() : '';
+    const apiBaseUrl = (apiBaseInput && apiBaseInput.value.trim()) || localStorage.getItem('cyoa_api_base') || '';
+
     try {
-      const res = await fetch('http://localhost:8000/shadow/consult', {
+      const res = await fetch(`${getEngineBaseUrl()}/shadow/consult`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ campaign, query })
+        body: JSON.stringify({
+          campaign,
+          query,
+          apiKey,
+          model,
+          provider,
+          apiBaseUrl,
+          post_to_channel: postToChannel,
+          apply_recal: applyRecal
+        })
       });
       if (res.ok) {
         const data = await res.json();
         resultBox.innerHTML = renderMarkdown(data.advice || 'No advice returned.');
+        if (Array.isArray(data.channel_messages)) {
+          campaignData.agentChannel = data.channel_messages;
+          renderShadowChannelFeed(campaignData.agentChannel);
+          showToast('Directive posted to Active GM channel (agent_channel.md).', 'success', 3500);
+        }
+        if (applyRecal) {
+          updateActiveRecalBanner(`[SYS: Active RECAL: ${query} - Expires: Turn ${currentTurn + 5}]`);
+        }
       } else {
         throw new Error(`Server returned ${res.status}`);
       }
@@ -2567,8 +2791,25 @@ function setupShadowNarrator() {
       const pacing = campaignData.statusJson?.pacing_state || {};
       const zoom = pacing.zoom_level || 'detailed_scene';
       const intensity = pacing.narrative_intensity !== undefined ? pacing.narrative_intensity : 1;
-      const advice = `🔮 **Shadow Narrator Advisory** (Offline Mode):\n\n- **Focus & Intensity**: ${zoom} • Level ${intensity}/5\n- **Query**: *${escapeHtml(query)}*\n\nMaintain causal continuity. Ground each narrative development in existing established facts and avoid unearned escalations.`;
+      const directive = `Honor player steering ("${query}") at zoom '${zoom}' and intensity ${intensity}/5.`;
+      const advice = `**Shadow Narrator Advisory** (Browser Mode):\n\n- **Focus & Intensity**: ${zoom} • Level ${intensity}/5\n- **Steering**: *${escapeHtml(query)}*\n\n**Active GM Directive**: ${escapeHtml(directive)}`;
       resultBox.innerHTML = renderMarkdown(advice);
+      if (postToChannel) {
+        campaignData.agentChannel = [...(campaignData.agentChannel || []), {
+          id: `MSG-${String((campaignData.agentChannel?.length || 0) + 1).padStart(3, '0')}`,
+          sender: 'SHADOW',
+          recipient: 'ACTIVE',
+          turn: currentTurn,
+          content: directive
+        }].slice(-10);
+        renderShadowChannelFeed(campaignData.agentChannel);
+        showToast('Directive queued in browser channel for Active GM.', 'info', 3000);
+      }
+      if (applyRecal) {
+        updateActiveRecalBanner(`[SYS: Active RECAL: ${query} - Expires: Turn ${currentTurn + 5}]`);
+      }
+    } finally {
+      if (consultBtn) consultBtn.disabled = false;
     }
   }
 
@@ -2776,9 +3017,140 @@ function setupStaticTabListeners() {
   });
 }
 
+// First-Time Usage Onboarding Modal & Quickstart Strip
+function setupOnboardingAndShortcuts() {
+  const modal = document.getElementById('onboarding-modal');
+  const helpBtn = document.getElementById('help-guide-btn');
+  const closeBtn = document.getElementById('close-onboarding-btn');
+  const skipBtn = document.getElementById('onboarding-skip-btn');
+  const nextBtn = document.getElementById('onboarding-next-btn');
+  const dontShowChk = document.getElementById('onboarding-dont-show-checkbox');
+  const openSettingsFromGuide = document.getElementById('onboarding-open-settings-btn');
+  const tabs = document.querySelectorAll('.onboarding-tab');
+  const panels = document.querySelectorAll('.onboarding-step');
+
+  const qsStrip = document.getElementById('quickstart-strip');
+  const qsSettingsBtn = document.getElementById('qs-open-settings-btn');
+  const qsGuideBtn = document.getElementById('qs-open-guide-btn');
+  const qsDismissBtn = document.getElementById('qs-dismiss-btn');
+
+  let currentStep = 1;
+
+  function setStep(step) {
+    currentStep = Math.max(1, Math.min(3, step));
+    tabs.forEach(t => {
+      const active = parseInt(t.dataset.step, 10) === currentStep;
+      t.classList?.toggle('active', active);
+    });
+    panels.forEach(p => {
+      const active = parseInt(p.dataset.stepPanel, 10) === currentStep;
+      p.classList?.toggle('active', active);
+    });
+    if (nextBtn) {
+      nextBtn.textContent = currentStep >= 3 ? 'Start Playing' : 'Next';
+    }
+  }
+
+  function openOnboarding(step = 1) {
+    if (!modal) return;
+    setStep(step);
+    modal.classList?.remove('hidden');
+  }
+
+  function closeOnboarding(persistPreference = true) {
+    if (!modal) return;
+    modal.classList?.add('hidden');
+    if (persistPreference && (!dontShowChk || dontShowChk.checked !== false)) {
+      localStorage.setItem('whimsy_onboarding_seen', 'true');
+    }
+  }
+
+  tabs.forEach(t => {
+    t.addEventListener('click', () => setStep(parseInt(t.dataset.step, 10) || 1));
+  });
+  if (helpBtn) helpBtn.addEventListener('click', () => openOnboarding(1));
+  if (closeBtn) closeBtn.addEventListener('click', () => closeOnboarding(true));
+  if (skipBtn) skipBtn.addEventListener('click', () => closeOnboarding(true));
+  if (nextBtn) {
+    nextBtn.addEventListener('click', () => {
+      if (currentStep < 3) {
+        setStep(currentStep + 1);
+      } else {
+        closeOnboarding(true);
+      }
+    });
+  }
+  if (openSettingsFromGuide) {
+    openSettingsFromGuide.addEventListener('click', () => {
+      closeOnboarding(true);
+      updateModelSettingsVisibility();
+      settingsModal?.classList?.remove('hidden');
+    });
+  }
+
+  if (qsSettingsBtn) {
+    qsSettingsBtn.addEventListener('click', () => {
+      updateModelSettingsVisibility();
+      settingsModal?.classList?.remove('hidden');
+    });
+  }
+  if (qsGuideBtn) qsGuideBtn.addEventListener('click', () => openOnboarding(1));
+  if (qsDismissBtn && qsStrip) {
+    qsDismissBtn.addEventListener('click', () => {
+      qsStrip.classList?.add('hidden');
+      localStorage.setItem('whimsy_quickstart_dismissed', 'true');
+    });
+  }
+
+  // Show onboarding on first open in real interactive browser sessions
+  const hasRealDOM = typeof document !== 'undefined' && typeof document.body !== 'undefined' && document.body !== null;
+  if (hasRealDOM && !window.__INLINED_BUILD__) {
+    if (localStorage.getItem('whimsy_onboarding_seen') !== 'true') {
+      if (dontShowChk) dontShowChk.checked = true;
+      openOnboarding(1);
+    }
+    const hasKey = Boolean(localStorage.getItem('gemini_api_key'));
+    if (qsStrip && !hasKey && localStorage.getItem('whimsy_quickstart_dismissed') !== 'true') {
+      qsStrip.classList?.remove('hidden');
+    }
+  }
+
+  // Keyboard shortcuts: Escape closes modals, 1-9 picks choices, Enter in recalInput submits
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        modal?.classList?.add('hidden');
+        settingsModal?.classList?.add('hidden');
+        document.getElementById('new-campaign-modal')?.classList?.add('hidden');
+        return;
+      }
+      const tag = (e.target && e.target.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      if (/^[1-9]$/.test(e.key)) {
+        const btn = document.querySelector(`.choice-btn[data-choice="${e.key}"]`);
+        if (btn) btn.click();
+      }
+    });
+  }
+
+  if (recalInput) {
+    recalInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        if (selectedChoice) {
+          executeTurnAction(selectedChoice.num, selectedChoice.text);
+        } else if (activeConfig?.operational_mode === 'freeform_simulation' && recalInput.value.trim()) {
+          executeTurnAction('', recalInput.value.trim());
+        }
+      }
+    });
+  }
+}
+
 // Initialize new UI components
 setupStaticTabListeners();
 setupDockResizer();
 setupNewCampaignWizard();
 setupShadowNarrator();
+setupOnboardingAndShortcuts();
 loadInitialData();
