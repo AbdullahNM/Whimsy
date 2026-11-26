@@ -1,0 +1,427 @@
+{
+  "campaign_id": "sample_campaign",
+  "schema_version": "1.0.0",
+  "description": "Entity registry, merchant house lineages, cohort rosters, relational edges, and disambiguation rules for The Cinder Ledger (Port Vane).",
+  "disambiguation_rules": [
+    {
+      "rule_id": "VESPER-01",
+      "confusion_risk": "Shared Vesper surname between the House Factor-General and a junior customs clerk at Pier Seven.",
+      "entities": [
+        {
+          "id": "maren_vesper",
+          "distinguishing_identity": "Maren Vesper (Factor-General of House Vesper, senior merchant matriarch)",
+          "role_and_tier": "House Leader / Senior Factor"
+        },
+        {
+          "id": "tomas_vesper",
+          "distinguishing_identity": "Tomas Vesper (Junior Watch-Clerk at Pier Seven Customs Shed, estranged nephew)",
+          "role_and_tier": "Junior Excise Clerk / Estranged Kin"
+        }
+      ],
+      "operational_guardrail": "Always use full name ('Maren Vesper' or 'Tomas Vesper') in prose and state updates. Never refer to either solely as 'Vesper'."
+    },
+    {
+      "rule_id": "ORIN-ORLOV-01",
+      "confusion_risk": "Phonetically similar names among harbor enforcement officers (Orlov vs. Orin).",
+      "entities": [
+        {
+          "id": "captain_orlov",
+          "distinguishing_identity": "Captain Orlov (Master of the harbor excise cutter Grey Gull)",
+          "role_and_tier": "Sea Patrol Commander"
+        },
+        {
+          "id": "watch_sergeant_orin",
+          "distinguishing_identity": "Watch-Sergeant Orin (Commander of the Outer Boom gatehouse watch)",
+          "role_and_tier": "Pier Watch Sergeant"
+        }
+      ],
+      "operational_guardrail": "Distinguish Captain Orlov (estuary cutter patrol) from Watch-Sergeant Orin (stationary Outer Boom gatehouse). Never swap their postings or titles."
+    }
+  ],
+  "houses_and_lineages": {
+    "house_merrow": {
+      "id": "house_merrow",
+      "name": "House Merrow",
+      "social_rank": "Chartered Shipping Barons",
+      "seat_or_origin": "Outer Wharf Ironhouse, Port Vane",
+      "motto": "Iron Holds the Tide",
+      "sigil": "A black iron chain link coiled around a gull's wing on grey slate",
+      "traditions": "Controls coastal colliers, harbor chain leases, and fast-packet crews running the Ashwater estuary.",
+      "cadet_branches": [],
+      "pedigree_tree": {
+        "patriarch_or_head": "Lord-Captain Hal Merrow",
+        "elder_generation": [
+          "Lord-Captain Hal Merrow"
+        ],
+        "active_generation": [
+          "captain_kestrel"
+        ],
+        "junior_generation": []
+      },
+      "members": [
+        "captain_kestrel"
+      ]
+    },
+    "house_vesper": {
+      "id": "house_vesper",
+      "name": "House Vesper",
+      "social_rank": "Chartered Warehouse Factors",
+      "seat_or_origin": "Vesper Counting House, Limestone Steps",
+      "motto": "Measured by Salt and Seal",
+      "sigil": "A pair of brass balance-scales over a split salt-crystal on deep crimson",
+      "traditions": "Holds royal bond leases for cured salt vaults, customs brokerage, and dry-cellar storage along the upper seawall.",
+      "cadet_branches": [
+        "Lower Quay Vesper (estranged)"
+      ],
+      "pedigree_tree": {
+        "patriarch_or_head": "maren_vesper",
+        "elder_generation": [
+          "maren_vesper"
+        ],
+        "active_generation": [
+          "maren_vesper"
+        ],
+        "junior_generation": [
+          "tomas_vesper"
+        ]
+      },
+      "members": [
+        "maren_vesper",
+        "tomas_vesper"
+      ]
+    }
+  },
+  "characters": {
+    "corin_hale": {
+      "id": "corin_hale",
+      "name": "Corin Hale",
+      "role": "Protagonist",
+      "archetype": "Junior Harbor Excise Clerk & Field Auditor",
+      "origin": "Lower Quay",
+      "faction": "Harbor Excise Office",
+      "status": "On Probation",
+      "traits": [
+        "observant",
+        "ledger-sharp",
+        "salt-bred"
+      ],
+      "summary": "A probationary excise auditor raised on the Lower Quay who reads dock manifests and timber marks better than high-table politics.",
+      "titles_and_aliases": [
+        "Junior Clerk Hale"
+      ],
+      "gender": "male",
+      "institutional": {
+        "affiliation": "Harbor Excise Office",
+        "division": "Pier Seven Customs Shed",
+        "cohort": "pier_seven_excise",
+        "rank_or_tier": "Junior Field Auditor (Probationary)"
+      },
+      "social_bonds": {
+        "allies": [
+          "elena_reed"
+        ],
+        "rivals": [],
+        "mentors": [
+          "inspector_bren"
+        ],
+        "mentees": []
+      }
+    },
+    "inspector_bren": {
+      "id": "inspector_bren",
+      "name": "Inspector Bren",
+      "role": "Senior Supervisor",
+      "archetype": "Veteran Harbor Excise Inspector",
+      "origin": "Old Seawall",
+      "faction": "Harbor Excise Office",
+      "status": "active",
+      "traits": [
+        "methodical",
+        "weathered",
+        "strict"
+      ],
+      "summary": "A scarred thirty-year customs officer who took Corin Hale onto Pier Seven on strict probation and answers only to the Port Reeve.",
+      "titles_and_aliases": [
+        "Senior Inspector Bren"
+      ],
+      "gender": "male",
+      "institutional": {
+        "affiliation": "Harbor Excise Office",
+        "division": "Pier Seven Customs Shed",
+        "cohort": "pier_seven_excise",
+        "rank_or_tier": "Senior Customs Inspector"
+      },
+      "social_bonds": {
+        "allies": [
+          "captain_orlov"
+        ],
+        "rivals": [
+          "maren_vesper"
+        ],
+        "mentors": [],
+        "mentees": [
+          "corin_hale",
+          "tomas_vesper"
+        ]
+      }
+    },
+    "maren_vesper": {
+      "id": "maren_vesper",
+      "name": "Maren Vesper",
+      "role": "Merchant Factor",
+      "archetype": "Factor-General of House Vesper",
+      "origin": "Limestone Steps",
+      "faction": "House Vesper",
+      "house_id": "house_vesper",
+      "status": "active",
+      "traits": [
+        "calculating",
+        "well-connected",
+        "guarded"
+      ],
+      "summary": "Head of House Vesper's bonded salt vaults and customhouse brokerage, accustomed to buying silence before trouble reaches the Tide-Gate.",
+      "titles_and_aliases": [
+        "Factor-General Vesper",
+        "Lady Factor"
+      ],
+      "gender": "female",
+      "kinship": {
+        "extended_kin": [
+          "tomas_vesper"
+        ]
+      },
+      "institutional": {
+        "affiliation": "House Vesper",
+        "division": "Vesper Counting House",
+        "rank_or_tier": "Factor-General"
+      },
+      "social_bonds": {
+        "allies": [],
+        "rivals": [
+          "captain_kestrel",
+          "inspector_bren"
+        ],
+        "mentors": [],
+        "mentees": []
+      }
+    },
+    "tomas_vesper": {
+      "id": "tomas_vesper",
+      "name": "Tomas Vesper",
+      "role": "Colleague & Estranged Nephew",
+      "archetype": "Junior Watch-Clerk",
+      "origin": "Limestone Steps (disowned branch)",
+      "faction": "Harbor Excise Office",
+      "house_id": "house_vesper",
+      "house_branch": "Lower Quay Vesper (estranged)",
+      "status": "active",
+      "traits": [
+        "nervous",
+        "indebted",
+        "quick-fingered"
+      ],
+      "summary": "Maren Vesper's estranged nephew, serving the night-to-dawn tally desk at Pier Seven while hiding gambling markers from his aunt.",
+      "titles_and_aliases": [
+        "Clerk Tomas"
+      ],
+      "gender": "male",
+      "kinship": {
+        "uncles_and_aunts": [
+          "maren_vesper"
+        ]
+      },
+      "institutional": {
+        "affiliation": "Harbor Excise Office",
+        "division": "Pier Seven Customs Shed",
+        "cohort": "pier_seven_excise",
+        "rank_or_tier": "Junior Watch-Clerk"
+      },
+      "social_bonds": {
+        "allies": [
+          "corin_hale"
+        ],
+        "rivals": [],
+        "mentors": [
+          "inspector_bren"
+        ],
+        "mentees": []
+      }
+    },
+    "captain_kestrel": {
+      "id": "captain_kestrel",
+      "name": "Captain Kestrel",
+      "role": "House Merrow Enforcer & Pilot",
+      "archetype": "Fast-Packet Master",
+      "origin": "Outer Wharf",
+      "faction": "House Merrow",
+      "house_id": "house_merrow",
+      "status": "active",
+      "traits": [
+        "blunt",
+        "sea-hardened",
+        "territorial"
+      ],
+      "summary": "Master of the Merrow fast-packet Sea Lark and primary harbor fixer for House Merrow's collier traffic.",
+      "titles_and_aliases": [
+        "Master of the Sea Lark"
+      ],
+      "gender": "female",
+      "institutional": {
+        "affiliation": "House Merrow",
+        "division": "Merrow Packet Fleet",
+        "cohort": "merrow_packet_crew",
+        "rank_or_tier": "Packet Captain"
+      },
+      "social_bonds": {
+        "allies": [],
+        "rivals": [
+          "maren_vesper"
+        ],
+        "mentors": [],
+        "mentees": []
+      }
+    },
+    "elena_reed": {
+      "id": "elena_reed",
+      "name": "Elena Reed",
+      "role": "Trusted Confidante",
+      "archetype": "Dockside Apothecary",
+      "origin": "Lower Quay",
+      "faction": "Lantern Quay Guildhall (Independent)",
+      "status": "active",
+      "traits": [
+        "steady",
+        "pragmatic",
+        "chemical-savvy"
+      ],
+      "summary": "Corin Hale's childhood friend from Lower Quay who keeps a narrow apothecary shop off Lantern Quay and knows pitch, wax, and brine residues by smell.",
+      "titles_and_aliases": [
+        "Apothecary Reed"
+      ],
+      "gender": "female",
+      "institutional": {
+        "affiliation": "Independent Guild Apothecary",
+        "division": "The Lantern Quay",
+        "rank_or_tier": "Licensed Compounder"
+      },
+      "social_bonds": {
+        "allies": [
+          "corin_hale"
+        ],
+        "rivals": [],
+        "mentors": [],
+        "mentees": []
+      }
+    },
+    "captain_orlov": {
+      "id": "captain_orlov",
+      "name": "Captain Orlov",
+      "role": "Estuary Patrol Officer",
+      "archetype": "Excise Cutter Commander",
+      "origin": "High Breakwater",
+      "faction": "Harbor Excise Office",
+      "status": "active",
+      "traits": [
+        "gruff",
+        "punctual",
+        "incorruptible"
+      ],
+      "summary": "Veteran commander of the excise cutter Grey Gull, responsible for outer estuary sweeps and contraband interception.",
+      "titles_and_aliases": [
+        "Master of the Grey Gull"
+      ],
+      "gender": "male",
+      "institutional": {
+        "affiliation": "Harbor Excise Office",
+        "division": "Outer Estuary Patrol",
+        "rank_or_tier": "Cutter Captain"
+      }
+    },
+    "watch_sergeant_orin": {
+      "id": "watch_sergeant_orin",
+      "name": "Watch-Sergeant Orin",
+      "role": "Boom Gate Commander",
+      "archetype": "Harbor Chain Watchman",
+      "origin": "Chainhouse Ward",
+      "faction": "Harbor Excise Office",
+      "status": "active",
+      "traits": [
+        "skeptical",
+        "by-the-book",
+        "observant"
+      ],
+      "summary": "Gate sergeant of the Outer Boom Watch who logs every hull crossing the iron harbor chain between dusk and midday.",
+      "titles_and_aliases": [
+        "Sergeant Orin"
+      ],
+      "gender": "male",
+      "institutional": {
+        "affiliation": "Harbor Excise Office",
+        "division": "Outer Boom Gatehouse",
+        "rank_or_tier": "Watch-Sergeant"
+      }
+    }
+  },
+  "cohort_rosters": {
+    "pier_seven_excise": {
+      "cohort_name": "Pier Seven Excise Detail",
+      "division": "Harbor Excise Office",
+      "tactical_doctrine": "Verify cargo seals before tide-gate slack; impound disputed hulls and log every discrepancy in ink.",
+      "members": [
+        "corin_hale",
+        "inspector_bren",
+        "tomas_vesper"
+      ]
+    },
+    "merrow_packet_crew": {
+      "cohort_name": "Merrow Packet Crew",
+      "division": "House Merrow Outer Wharf",
+      "tactical_doctrine": "Move high-value freight before customs inspections harden, leaning on iron-chain leases and dockside muscle.",
+      "members": [
+        "captain_kestrel"
+      ]
+    }
+  },
+  "relational_graph_edges": [
+    {
+      "source": "inspector_bren",
+      "target": "corin_hale",
+      "type": "MENTORSHIP",
+      "directed": true,
+      "weight": 0.85,
+      "description": "Inspector Bren oversees Corin Hale's probationary audit work at Pier Seven Customs Shed."
+    },
+    {
+      "source": "captain_kestrel",
+      "target": "maren_vesper",
+      "type": "RIVALRY",
+      "directed": false,
+      "weight": 0.9,
+      "description": "House Merrow's packet crews and House Vesper's bonded vaults compete fiercely for estuary freight monopolies."
+    },
+    {
+      "source": "maren_vesper",
+      "target": "tomas_vesper",
+      "type": "kinship_uncle_nephew",
+      "directed": true,
+      "weight": 0.65,
+      "description": "Maren Vesper is Tomas Vesper's aunt and estranged family head; she disowned his branch after a tally scandal."
+    },
+    {
+      "source": "corin_hale",
+      "target": "elena_reed",
+      "type": "ALLIANCE",
+      "directed": false,
+      "weight": 0.9,
+      "description": "Childhood friends from Lower Quay who trade quiet favors, remedies, and chemical tests."
+    },
+    {
+      "source": "tomas_vesper",
+      "target": "maren_vesper",
+      "type": "DEBT",
+      "directed": true,
+      "weight": 0.75,
+      "description": "Tomas Vesper quietly owes coin through a broker tied back to House Vesper's counting house."
+    }
+  ]
+}

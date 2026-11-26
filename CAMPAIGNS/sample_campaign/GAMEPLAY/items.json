@@ -1,0 +1,56 @@
+{
+  "campaign_id": "sample_campaign",
+  "purse": {
+    "gold": 2,
+    "silver": 12,
+    "copper": 8,
+    "display": "2G 12S 8C"
+  },
+  "equipped": [
+    {
+      "name": "Damp Oilskin Coat",
+      "slot": "Outerwear",
+      "condition": "Weathered (Watertight)",
+      "specs": "Heavy waxed canvas coat with deep inside pockets for tally slates."
+    },
+    {
+      "name": "Brass Excise Seal-Punch",
+      "slot": "Belt Holster",
+      "condition": "Clean & Sharp",
+      "specs": "Stamped Harbor Excise die #P7-14 used to notch lead tags and press inspection wax."
+    },
+    {
+      "name": "Oiled Leather Ledger Satchel",
+      "slot": "Shoulder",
+      "condition": "Good (Soot-Smudged)",
+      "specs": "Holds blank cargo forms, waterproof parchment sleeves, chalk, and brass dividers."
+    }
+  ],
+  "inventory": [
+    {
+      "name": "Harbor Excise Probationary Warrant",
+      "quantity": 1,
+      "notes": "Signed by Inspector Bren; grants boarding rights on impounded vessels at Pier Seven."
+    },
+    {
+      "name": "Tallow Storm-Lantern (Shuttered)",
+      "quantity": 1,
+      "notes": "Half-full of whale oil; brass wind-hooded."
+    },
+    {
+      "name": "Iron Scrapers & Wax Knife",
+      "quantity": 1,
+      "notes": "Folding pocket blade used to pry crate lids and sample seal wax."
+    },
+    {
+      "name": "The Cinder Ledger (Half-Charred Manifest)",
+      "quantity": 1,
+      "notes": "Recovered from The Redwing wheelhouse; retains a torn #P7-088 crimson-inked tally stub."
+    },
+    {
+      "name": "Forged Vesper Bond-Slip & Crimson Wax Sample",
+      "quantity": 1,
+      "notes": "Obtained from Yard-Clerk Davin; lists The Redwing's salt-crates for Maren Vesper's private vaults with a matching #P7-088 counter-initial and brick-red wax flake."
+    }
+  ]
+}

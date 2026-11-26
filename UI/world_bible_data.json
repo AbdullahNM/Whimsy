@@ -1,16 +1,80 @@
 {
-  "CORE": [
-    {
-      "id": "setting_primer",
-      "title": "Setting Primer",
-      "content": "# Setting Primer\n\nThe campaign takes place in the **Metro Core**, a dense city-state ringed by automated transit arcs and layered access controls.\n\n## Pillars\n\n- **Contracts drive the plot.** Every opportunity carries a cost, a deadline, or a rival.\n- **Resources are finite.** Energy, stress, funds, and reputation all move with your choices.\n- **Knowledge is earned.** Public facts are known or suspected; hidden truth must be discovered in play.\n- **Consequences persist.** State changes are recorded in `GAMEPLAY/` and never silently reset.\n"
-    }
-  ],
-  "PLACES": [
-    {
-      "id": "overview",
-      "title": "Places Overview",
-      "content": "# Places Overview\n\n- **Metro Core:** Central hub of commerce and contract work; layered transit arcs and checkpoints.\n- **Terminal Bay A:** Staging area where briefings and first missions begin.\n- **The Archive:** Restricted records vault guarded by layered access controls and rival interest.\n"
-    }
-  ]
+  "sample_campaign": {
+    "CORE": [
+      {
+        "id": "setting_primer",
+        "title": "Port Vane Setting Primer",
+        "content": "# Port Vane Setting Primer\n\n**Port Vane** stands at the salt-stained mouth of the Ashwater estuary, built across tiered limestone sea-walls and black slate pilings driven deep into tidal mud. Twice a day the estuary swells twelve feet, turning low stone alleys into canalways and lifting heavy coal-barges level with the timber quays.\n\n## Harbor Law & The Tide-Gate\n\n- **The Iron Harbor Chain**: A heavy forged chain spans the Outer Boom between two squat stone chainhouses. It is winched taut at dusk and lowered only at the midday Tide-Gate slack unless an Excise Master presents a counter-signed warrant.\n- **Excise Stamps**: Under the Royal Salt Charter of 412, every crate of refined salt, bale of canvas, and seam of coal entering port must bear a fresh Harbor Excise wax stamp—amber beeswax for general freight, black resin for bonded coal.\n- **Pier Seven Customs Shed**: The outer inspection shed where drifting, damaged, or disputed hulls are chained until their manifests match their holds.\n\n## Currency & Trade\n\nPort Vane reckons coin by weight and city mint:\n\n- **Gold Crowns (G)**: Mint-stamped merchant gold; `1G = 20 Silver Marks (S)`.\n- **Silver Marks (S)**: Dock wages, warehouse bonds, and customs fines; `1S = 12 Copper Pence (C)`.\n- **Copper Pence (C)**: Ferryman fares, tallow candles, ink, and hot broth at the quay stalls.\n\n## Craft & Realism\n\nPort Vane runs on timber, iron, rope, tallow, and salt. There is no arcane spellcraft on the docks; apothecaries mix herbal poultices, pitch, quicklime, and lamp oils using practical craft. Power belongs to whoever controls the wharves, the chain winches, and the wax seals.\n"
+      }
+    ],
+    "FACTIONS": [
+      {
+        "id": "harbor_excise_and_houses",
+        "title": "Harbor Excise & The Merchant Houses",
+        "content": "# Harbor Excise & The Merchant Houses\n\nTrade in Port Vane rests on an uneasy three-way balance between the city's customs officers and the two chartered houses that own its ships and cellars.\n\n## Harbor Excise Office\n\n- **Mandate**: Enforces the Royal Salt Charter of 412, collects tonnage and cargo duties, and oversees the Outer Boom chain and midday Tide-Gate.\n- **Authority**: Answers to the Port Reeve and Royal Exchequer, though chronic underfunding leaves outer piers like Pier Seven reliant on small crews of inspectors and probationary clerks.\n- **Insignia**: A brass pair of scales stamped over a harbor chain link.\n\n## House Merrow\n\n- **Domain**: Coastal colliers, fast estuary packets, tugboats, and the maintenance lease on the iron harbor chain winches at the Outer Wharf.\n- **Reputation**: Tough, ship-first, and fiercely protective of their hulls. Merrow captains expect quick dockside clearances and despise Excise delays.\n- **Sigil**: A black iron chain link coiled around a gull's wing on grey slate.\n\n## House Vesper\n\n- **Domain**: Bonded limestone salt vaults, customs brokerage, marine credit notes, and dry-storage warehouses along the Limestone Steps.\n- **Reputation**: Methodical, well-connected at the Port Reeve's court, and ruthless when protecting bonded monopolies or suppressing irregular paperwork.\n- **Sigil**: Brass balance-scales over a split salt-crystal on deep crimson.\n"
+      }
+    ],
+    "GUIDES": [
+      {
+        "id": "campaign_rules",
+        "title": "Campaign Rules — The Cinder Ledger",
+        "content": "# Campaign Rules — The Cinder Ledger\n\n## Operational Mode: Classic CYOA\n\n- Select a numbered option (`1`–`4`) at the end of each turn to resolve Corin Hale's next decision.\n- Every action carries real consequences across Stamina, Heat, Purse, clocks, and faction standing.\n\n## Clocks & Stakes\n\n1. **Midday Tide-Gate Audit (0/4 — Known)**: Tracks how close Port Vane is to the midday slack tide, when the iron harbor chain lowers and the Chief Tide-Master demands final manifest clearance.\n2. **House Interference (0/6 — Suspected)**: Tracks how aggressively House Merrow and House Vesper move to bury, bribe, or seize *The Redwing* evidence.\n\n## Progression & Currency\n\n- **Zero Micro-Scene Rule**: Routine dialogue, short dock walks, and minor inspections give `Delta: 0` progression. Milestone XP is awarded when completing formal investigation phases, uncovering verified primary evidence, or resolving major confrontations.\n- **Currency**: `1 Gold Crown (G) = 20 Silver Marks (S)`, `1 Silver Mark (S) = 12 Copper Pence (C)`.\n"
+      }
+    ],
+    "PEOPLE": [
+      {
+        "id": "captain_kestrel",
+        "title": "Captain Kestrel",
+        "content": "# Captain Kestrel\n\n- **Title & Role**: Master of the Fast-Packet *Sea Lark*\n- **Faction**: House Merrow (`house_merrow`)\n- **Cohort**: `merrow_packet_crew`\n\n## Appearance & Mannerisms\n\nCompact and broad-shouldered in a salt-bleached leather jerkin, Captain Kestrel wears brass ear-hoops and keeps a coiled marlinspike strapped to her belt. Her hands are calloused black from hemp hawsers and coal dust, and she walks with the wide, rolling balance of a river pilot.\n\n## Voice & Demeanor\n\nBlunt, impatient, and territorial about the Outer Wharf. She treats customs forms as shore-lubber nuisance and speaks to Excise clerks as if they were dockhands standing in the way of a mooring line.\n\n## Public Standing\n\nKestrel commands House Merrow's fastest estuary packet boat and often handles urgent cargo disputes for Lord-Captain Hal Merrow before the Port Reeve's clerks even wake up.\n"
+      },
+      {
+        "id": "elena_reed",
+        "title": "Elena Reed",
+        "content": "# Elena Reed\n\n- **Title & Role**: Dockside Apothecary & Licensed Compounder\n- **Faction**: Independent Guildhall (The Lantern Quay)\n\n## Appearance & Mannerisms\n\nElena is in her mid-twenties with dark hair pinned back under a waxed linen kerchief, ink-and-herb-stained knuckles, and spectacles tucked into her apron pocket for close weighing. Her wool sleeves always carry the sharp scent of clove oil, pine pitch, and dried sea-fennel.\n\n## Voice & Demeanor\n\nPractical, brisk, and skeptical of tall harbor tales. When Corin Hale brings her an odd scrap of resin, wax, or burned wood, she prefers scraping it onto a slate dish with vinegar and lamp-heat rather than guessing.\n\n## Relationship to Corin Hale\n\nElena and Corin grew up two alleys apart in the Lower Quay. She patched his ribs when he fell off a collier boom at fourteen, and she still keeps a kettle hot behind her counter when he comes off early watch.\n"
+      },
+      {
+        "id": "inspector_bren",
+        "title": "Inspector Bren",
+        "content": "# Inspector Bren\n\n- **Title & Role**: Senior Harbor Excise Inspector, Pier Seven Customs Shed\n- **Faction**: Harbor Excise Office\n- **Cohort**: `pier_seven_excise`\n\n## Appearance & Mannerisms\n\nA weathered man in his late fifties with grey-streaked whiskers, tar-stained cuffs, and a crooked left thumb broken decades ago hauling seized cargo chains. He wears a heavy oilskin greatcoat pinned with the tarnished brass scale-badge of the Harbor Excise Office and speaks in clipped, unhurried sentences.\n\n## Voice & Demeanor\n\nBren rarely raises his voice. When annoyed, he taps the brass ferrule of his tally-cane once against the pier planking and waits for a clerk to find the mistake himself. He trusts ink, weights, and unbroken wax far more than merchant house promises.\n\n## Relationship to Corin Hale\n\nBren took Corin Hale onto Pier Seven on strict probation because Lower Quay boys know tide-tables and hull marks by heart. He expects clean paperwork before the midday Tide-Gate opens and will not shield Corin if a merchant house catches him cutting corners.\n"
+      },
+      {
+        "id": "maren_vesper",
+        "title": "Maren Vesper",
+        "content": "# Maren Vesper\n\n- **Title & Role**: Factor-General of House Vesper\n- **Faction**: House Vesper (`house_vesper`)\n- **Disambiguation Note**: Never confuse **Maren Vesper** (Factor-General at the Limestone Steps) with her estranged nephew **Tomas Vesper** (Junior Watch-Clerk at Pier Seven).\n\n## Appearance & Mannerisms\n\nTall, silver-haired, and dressed in dark slate wool lined with dry otter fur, Maren Vesper carries herself with the quiet stiffness of a magistrate. A heavy silver signet ring—not brass—sits on her right forefinger, and she keeps her gloves spotless even on damp harbor mornings.\n\n## Voice & Demeanor\n\nShe speaks calmly, never threatening aloud when a polite reminder of bond-tariffs, harbor credit, or the Port Reeve's favor will do the work. She treats customs clerks as minor obstacles to be timed, outwaited, or priced.\n\n## Known Ties\n\nShe cut off her nephew **Tomas Vesper**'s branch of the family years ago after a counting-house tally scandal, though she still watches Pier Seven closely whenever House Vesper salt-crates move through the Outer Boom.\n"
+      }
+    ],
+    "PLACES": [
+      {
+        "id": "pier_seven_customs",
+        "title": "Pier Seven Customs Shed",
+        "content": "# Pier Seven Customs Shed\n\nBuilt out over the outer estuary on tarred oak beams and wet black slate pilings, **Pier Seven** is the first checkpoint inside the Outer Boom. When fog rolls off the Ashwater, the shed's iron roof drips steadily onto stacked salt-barrels and coiled mooring hawsers.\n\n## Layout & Atmosphere\n\n- **The Tally Porch**: An open timber gallery facing the Outer Boom chain. Brass storm-lanterns hang from iron hooks, casting yellow pools over wet planks and chalked cargo slates.\n- **The Clerk's Cage**: A cramped pine-board office inside the shed smelling of damp wool, iron-gall ink, and coal smoke from a rusted brazier. Here sit the bound harbor ledgers, spare wax dies, and the brass seal-presses.\n- **The Impound Slip**: A narrow stone berth tucked beside the eastern piling wall, fitted with heavy mooring rings where *The Redwing* now rides low in the grey swell.\n\n## Sensory Anchors\n\n- **Sounds**: Clank of the outer boom links, gulls fighting over crab shells, water slapping the pilings, and the scratch of quill pens against damp ledger paper.\n- **Smells**: Wet coal ash, sour estuary mud, beeswax, tarred hemp, and brine.\n- **Lighting**: Pale dawn mist cut by whale-oil lanterns and the red coal glow from the clerk's brazier.\n"
+      },
+      {
+        "id": "the_lantern_quay",
+        "title": "The Lantern Quay",
+        "content": "# The Lantern Quay\n\n**The Lantern Quay** curves along the Lower Quay seawall three piers inward from the Outer Boom. Named for the row of iron-caged whale-oil lamps nailed to its timber awnings, it serves night-shift chainmen, barge hands, and dockside traders who work between tides.\n\n## Notable Landmarks\n\n- **Elena Reed's Apothecary**: A narrow brick-and-shingle storefront wedged between a sail-mender's loft and a salted-herring cellar. Shelves hold amber glass bottles, dried sea-fennel, pine pitch, and brass mortar bowls.\n- **The Salt & Anchor Taproom**: A low-ceilinged dock tavern smelling of boiled cabbage, wet wool, and cheap rye ale. Night-shift ferrymen and collier deckhands trade gossip here before dawn muster.\n- **The Ferry Steps**: Slick limestone stairs descending straight into the tidal basin, where skiffmen pole passengers across to the Outer Wharf for two Copper Pence.\n\n## Sensory Anchors\n\n- **Sounds**: Iron tavern signs creaking in the salt wind, clatter of wooden clogs on wet cobblestones, and muffled voices behind shuttered windows.\n- **Smells**: Pine pitch, fried fish oil, damp mortar, and vinegar-washed timber.\n"
+      },
+      {
+        "id": "vesper_counting_house",
+        "title": "Vesper Counting House",
+        "content": "# Vesper Counting House\n\nPerched atop the dry **Limestone Steps** above the floodline, the **Vesper Counting House** commands a clear view over the entire harbor basin and the Outer Boom chain. Heavy oak shutters, brass-bound doors, and hired watchmen keep dockside mud out of its limestone foyer.\n\n## Architecture & Operations\n\n- **The Lower Salt Vaults**: Thick-walled stone cellars built into the cliffside behind the counting house, kept dry with quicklime pans and iron ventilation grates. House Vesper stores thousands of cured salt-crates here under royal customs bond.\n- **The Factor's Gallery**: An upper floor paved in pale stone tiles, furnished with long walnut ledger desks, brass balance-scales, and locked strongboxes holding harbor promissory notes.\n- **Maren Vesper's Study**: Overlooks Pier Seven through leaded glass panes; a brass spyglass rests in a wooden cradle on the windowsill.\n\n## Sensory Anchors\n\n- **Sounds**: Crisp rustle of parchment, measured ticking of a weighted pendulum clock, and heavy boots on dry limestone.\n- **Smells**: Dry paper, cedarwood oil, sealing wax, and faint mineral dust from the salt cellars below.\n"
+      }
+    ]
+  },
+  "template_campaign": {
+    "CORE": [
+      {
+        "id": "setting_primer",
+        "title": "Setting Primer",
+        "content": "# Setting Primer\n\nThe campaign takes place in the **Metro Core**, a dense city-state ringed by automated transit arcs and layered access controls.\n\n## Pillars\n\n- **Contracts drive the plot.** Every opportunity carries a cost, a deadline, or a rival.\n- **Resources are finite.** Energy, stress, funds, and reputation all move with your choices.\n- **Knowledge is earned.** Public facts are known or suspected; hidden truth must be discovered in play.\n- **Consequences persist.** State changes are recorded in `GAMEPLAY/` and never silently reset.\n"
+      }
+    ],
+    "PLACES": [
+      {
+        "id": "overview",
+        "title": "Places Overview",
+        "content": "# Places Overview\n\n- **Metro Core:** Central hub of commerce and contract work; layered transit arcs and checkpoints.\n- **Terminal Bay A:** Staging area where briefings and first missions begin.\n- **The Archive:** Restricted records vault guarded by layered access controls and rival interest.\n"
+      }
+    ]
+  }
 }

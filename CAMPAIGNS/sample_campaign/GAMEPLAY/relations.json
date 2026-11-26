@@ -1,0 +1,63 @@
+{
+  "campaign_id": "sample_campaign",
+  "key_contacts": [
+    {
+      "name": "Inspector Bren",
+      "role": "Senior Harbor Excise Inspector",
+      "affiliation": "Harbor Excise Office",
+      "standing": "Strict Mentor (Expectant)",
+      "status": "Holding Pier Seven Slip",
+      "notes": "Observed Corin recover the Cinder Ledger at 07:00; waiting at Pier Seven for documented cargo proof before midday."
+    },
+    {
+      "name": "Tomas Vesper",
+      "role": "Junior Watch-Clerk",
+      "affiliation": "Harbor Excise Office",
+      "standing": "Uneasy Colleague (Guarded)",
+      "status": "At Pier Seven Clerk's Cage",
+      "notes": "Maren Vesper's estranged nephew. Worked the dawn tally desk when The Redwing fouled the Outer Boom."
+    },
+    {
+      "name": "Elena Reed",
+      "role": "Dockside Apothecary",
+      "affiliation": "The Lantern Quay",
+      "standing": "Trusted Old Friend (Supportive)",
+      "status": "In Shop at Lantern Quay",
+      "notes": "Tested the wheelhouse soot and confirmed pine pitch with lamp-oil accelerant; mentioned buying cheap tallow from a frightened deckhand two nights ago."
+    }
+  ],
+  "rival_houses_and_factions": [
+    {
+      "name": "House Merrow",
+      "role": "Chartered Shipping Barons",
+      "standing": "Hostile / Confrontational",
+      "status": "Representative: Captain Kestrel (at Counting House Gate)",
+      "notes": "Captain Kestrel and two deckhands just intercepted Corin at the Counting House Gate, demanding to inspect what burned aboard The Redwing."
+    },
+    {
+      "name": "House Vesper",
+      "role": "Bonded Warehouse Factors",
+      "standing": "Hostile / Calculating",
+      "status": "Representative: Maren Vesper (at Counting House Gate)",
+      "notes": "Maren Vesper and two factor-guards have blocked the Pier Seven lane after spotting the charred Cinder Ledger in Corin's satchel."
+    }
+  ],
+  "transient_contacts": [
+    {
+      "name": "Barge-Hand Pell",
+      "affiliation": "The Lantern Quay Ferry Steps",
+      "role": "Night-shift chainman & skiffman",
+      "first_encountered_turn": 3,
+      "status": "Cooperative (Cautious)",
+      "notes": "Reported seeing two strangers in dry oilskins pay silver to ferry three quiet sailors ashore upriver before dawn, and noted a grey-coated Vesper tally-boy buying silence on the quay."
+    },
+    {
+      "name": "Yard-Clerk Davin",
+      "affiliation": "Vesper Counting House Outer Yard",
+      "role": "Archive & waste-tally clerk",
+      "first_encountered_turn": 4,
+      "status": "Paid Informant (2S)",
+      "notes": "Took two silver marks to hand over a discarded #P7-088 bonded-salt transfer slip and matching crimson wax flake from the counting house yard."
+    }
+  ]
+}

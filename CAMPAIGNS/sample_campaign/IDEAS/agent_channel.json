@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "campaign_id": "sample_campaign",
+  "rolling_window_limit_per_role": 5,
+  "updated_at": "2026-11-26T05:48:21.092093+00:00",
+  "messages": [
+    {
+      "id": "MSG-001",
+      "sender": "SHADOW",
+      "recipient": "ACTIVE",
+      "turn": 1,
+      "timestamp": "2026-11-26T06:15:00Z",
+      "content": "**Focus**: Turn 1 Opening Anchor, Epistemic Boundaries & Pacing Discipline.\n**Directives**:\n1. Keep the opening act anchored around Pier Seven Customs Shed and The Lantern Quay under the midday Tide-Gate Audit clock (`0/4`).\n2. Enforce entity disambiguation (`VESPER-01` & `ORIN-ORLOV-01`): always write **Maren Vesper** vs **Tomas Vesper**, and **Captain Orlov** vs **Watch-Sergeant Orin**.\n3. Enforce the Zero Micro-Scene Rule (`Delta: 0` XP on routine transit, conversation, or minor searches) and strict `CORE-003` unadorned prose (no sentence > 35 words, no decorative micro-SFX, no narrator praise, no formulaic closing questions).\n4. Do not reveal `MYSTERY-01` (black powder beneath salt), `MYSTERY-02` (paid-off crew and pitch arson), or `MYSTERY-03` (Tomas Vesper's blank dock-passes) unless Corin earns concrete physical evidence or wins a pressured confession."
+    },
+    {
+      "id": "MSG-002",
+      "sender": "ACTIVE",
+      "recipient": "SHADOW",
+      "turn": 2,
+      "timestamp": "2026-11-26T05:48:21.068268+00:00",
+      "content": "**Milestone Sync**: Turn 2 Wheelhouse Search Complete.\n**Summary**: Corin Hale boarded *The Redwing*, recovered the half-charred **Cinder Ledger** with torn `#P7-088` tally stub, and noted sharp pine-pitch odor in the desk. `tide_gate_audit` ticked `0 -> 1` (`07:00`), Stamina `100 -> 90`, `Delta: 0 XP` (Zero Micro-Scene Rule)."
+    },
+    {
+      "id": "MSG-003",
+      "sender": "SHADOW",
+      "recipient": "ACTIVE",
+      "turn": 3,
+      "timestamp": "2026-11-26T05:48:21.076086+00:00",
+      "content": "**Focus**: Lantern Quay & Counting House Yard Pacing.\n**Directives**:\n1. Prose & Zero Micro-Scene audit passed (`turn_0002.md` clean).\n2. Log dockside/yard incidental NPCs strictly in `GAMEPLAY/relations.*` (`transient_contacts`).\n3. Keep `MYSTERY-01` (black powder beneath salt) and `MYSTERY-03` (Tomas Vesper gambling debt) sealed until Corin pries a crate or confronts Tomas Vesper with serial proof.\n4. Tick `house_interference` when House Vesper or House Merrow scouts spot Corin investigating off-pier."
+    },
+    {
+      "id": "MSG-004",
+      "sender": "ACTIVE",
+      "recipient": "SHADOW",
+      "turn": 4,
+      "timestamp": "2026-11-26T05:48:21.084262+00:00",
+      "content": "**Milestone Sync**: Pier Seven Inspection Phase Complete (+25 XP).\n**Summary**: At The Lantern Quay, transient witness **Barge-Hand Pell** reported pre-dawn ferrying of *The Redwing*'s crew, and **Elena Reed** confirmed pine-pitch and lamp-oil accelerant (`house_interference` `0 -> 1`, Heat `10 -> 15`). At Vesper Counting House outer yard, Corin paid transient **Yard-Clerk Davin** `2S` (`2G 14S 8C -> 2G 12S 8C`) for a forged `#P7-088` bond-slip and matching crimson wax flake (`tide_gate_audit` `1 -> 2`, `XP: 0 -> 25`)."
+    },
+    {
+      "id": "MSG-005",
+      "sender": "SHADOW",
+      "recipient": "ACTIVE",
+      "turn": 5,
+      "timestamp": "2026-11-26T05:48:21.092093+00:00",
+      "content": "**Focus**: Turn 6 Crossroads Calibration (Counting House Gate, Day 1, 10:15).\n**Directives**:\n1. Escalate cleanly to `scene_type: conflict`, `narrative_intensity: 3` as **Maren Vesper** and **Captain Kestrel** intercept Corin at the Counting House Gate (`house_interference` `2/6`, Heat `25/100`).\n2. Maintain `VESPER-01` & `ORIN-ORLOV-01` disambiguation in all options and prose.\n3. Enforce Zero Micro-Scene Rule on Turn 6 opening flight/parley (`Delta: 0 XP`) unless Corin resolves the standoff or forces a Pier Seven crate opening."
+    }
+  ]
+}

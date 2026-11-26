@@ -1,0 +1,222 @@
+{
+  "campaign_id": "sample_campaign",
+  "schema_version": "1.0.0",
+  "world_name": "Port Vane & The Ashwater Estuary",
+  "overview": "A rain-lashed tidal port built on black slate pilings and limestone sea-walls. Trade is governed by iron harbor chains, midday tide-gates, brass customs seals, and bitter rivalry between chartered merchant houses.",
+  "immutable_facts": [
+    {
+      "id": "FACT-01",
+      "category": "geography",
+      "statement": "Port Vane sits on black slate pilings and tiered limestone sea-walls straddling the mouth of the Ashwater estuary.",
+      "notes": "Flood tides rise twelve feet twice daily, submerging the lower pilings and controlling ship draft clearance."
+    },
+    {
+      "id": "FACT-02",
+      "category": "natural_laws",
+      "statement": "The iron harbor chain at the Outer Boom is raised at dusk and lowered only at the midday Tide-Gate slack unless an Excise Master presents a counter-signed warrant.",
+      "notes": "No deep-draft vessel can legally clear the harbor mouth while the chain is taut."
+    },
+    {
+      "id": "FACT-03",
+      "category": "history",
+      "statement": "Under the Royal Salt Charter of 412, all refined salt and black-seam coal entering Port Vane must carry an unbroken Harbor Excise wax stamp before bonded vaulting.",
+      "notes": "Counterfeiting or tampering with an excise stamp carries mandatory seizure and penal hulks."
+    },
+    {
+      "id": "FACT-04",
+      "category": "natural_laws",
+      "statement": "Port Vane alchemy is strictly craft-based: pitch, whale-lantern oil, quicklime, and salt-curing brine follow mundane physical limits with no arcane spellcraft.",
+      "notes": "Low-fantasy realism constraint."
+    }
+  ],
+  "mutable_world_state": {
+    "active_epoch": "Late Autumn — High Fog & Tightening Excise Audits",
+    "factions_control": {
+      "Harbor Excise Office": "Legal customs authority over Pier Seven, the Outer Boom gatehouse, and the midday Tide-Gate.",
+      "House Merrow": "Controls the Outer Wharf, coastal collier fleets, and maintenance leases on the harbor chain winches.",
+      "House Vesper": "Controls the bonded salt vaults along the Limestone Steps and municipal customs credit brokerage."
+    },
+    "resource_distribution": {
+      "lantern_oil": "Steady supply in merchant stores; rationed on outer watch piers during prolonged autumn fog.",
+      "bonded_salt": "Stockpiled tightly in House Vesper cellars ahead of winter fishing fleets.",
+      "black_seam_coal": "In high demand; colliers delayed up-estuary by shallow autumn shoals."
+    },
+    "global_tensions_index": "Elevated — House Merrow and House Vesper are contesting custody of an unscheduled burned coal-barge before midday audit.",
+    "dynamic_flags": {
+      "redwing_impounded": true,
+      "midday_audit_pending": true,
+      "harbor_chain_lowered": false
+    }
+  },
+  "factions_and_tensions": [
+    {
+      "id": "harbor_excise_office",
+      "name": "Harbor Excise Office",
+      "agenda": "Enforce the Royal Salt Charter, collect port tariffs, and prevent the merchant houses from turning the Outer Boom into private smuggling water.",
+      "objectives": [
+        "Complete an accurate manifest audit on The Redwing before the midday Tide-Gate opens",
+        "Keep House Merrow and House Vesper agents off Pier Seven until the Port Reeve signs the seizure writ"
+      ],
+      "tensions": [
+        {
+          "target_entity": "House Merrow",
+          "source_of_friction": "Suspicion that Merrow winch-crews drop the harbor chain off-ledger on foggy nights",
+          "intensity": "simmering"
+        },
+        {
+          "target_entity": "House Vesper",
+          "source_of_friction": "Disputed valuation tariffs on bonded salt-crates routed through Limestone Steps cellars",
+          "intensity": "simmering"
+        }
+      ]
+    },
+    {
+      "id": "house_merrow",
+      "name": "House Merrow",
+      "agenda": "Protect its coastal collier monopoly and bury any evidence tying Merrow barges to unlicensed estuary runs.",
+      "objectives": [
+        "Recover or burn the half-charred manifest aboard The Redwing before midday",
+        "Force the Excise Office to release the barge's timber hull for scrap salvage"
+      ],
+      "tensions": [
+        {
+          "target_entity": "House Vesper",
+          "source_of_friction": "House Vesper is trying to undercut Merrow shipping insurance and seize unpaid hull liens",
+          "intensity": "escalating"
+        }
+      ]
+    },
+    {
+      "id": "house_vesper",
+      "name": "House Vesper",
+      "agenda": "Expand control over Port Vane's bonded salt trade and suppress proof of irregular crimson-stamped crates.",
+      "objectives": [
+        "Claim custody of the crimson-stamped salt-crates aboard The Redwing under salvage bond",
+        "Quietly verify whether anyone inside Pier Seven recognizes the private crimson die"
+      ],
+      "tensions": [
+        {
+          "target_entity": "House Merrow",
+          "source_of_friction": "Competes over freight priority at the Tide-Gate and blames Merrow pilots for lost bonded cargo",
+          "intensity": "escalating"
+        }
+      ]
+    }
+  ],
+  "npc_knowledge": {
+    "inspector_bren": {
+      "knows": [
+        "The Redwing drifted into the Outer Boom chain around three bells before dawn with its wheelhouse burned out.",
+        "No crew or lifeboat was found aboard the barge.",
+        "Corin Hale is on his final month of probation and needs a clean, documented audit."
+      ],
+      "does_not_know": [
+        "Who cut the private crimson wax stamp on the bonded salt-crates.",
+        "That Tomas Vesper left his tally post briefly during the night watch.",
+        "What cargo actually hides beneath the top layer of salt-crates."
+      ],
+      "falsely_believes": [
+        "Believes the barge fire started from a careless galley stove rather than deliberate pitch-rag arson."
+      ]
+    },
+    "maren_vesper": {
+      "knows": [
+        "House Vesper's private counting house holds an older crimson wax die once used for exempt ducal salt.",
+        "The Redwing was carrying cargo bonded in one of her lower river factors' names.",
+        "Watch-Clerk Tomas Vesper works the Pier Seven tally shed."
+      ],
+      "does_not_know": [
+        "Exactly how much of The Redwing's manifest survived the fire.",
+        "Whether Corin Hale has already pocketed loose pages from the barge."
+      ],
+      "falsely_believes": [
+        "Believes Inspector Bren can be stalled until afternoon by filing a routine Port Reeve writ."
+      ]
+    },
+    "tomas_vesper": {
+      "knows": [
+        "He signed two blank dock-passes three nights ago to clear a gambling marker at the Lantern Quay.",
+        "He recognizes the red hue of his aunt Maren Vesper's private seal wax."
+      ],
+      "does_not_know": [
+        "That his signed dock-passes were used to falsify The Redwing's upriver clearance.",
+        "What happened to the barge's missing crew."
+      ],
+      "falsely_believes": [
+        "Believes his unpaid markers are held by an ordinary dockside bookmaker rather than a Vesper factor."
+      ]
+    },
+    "captain_kestrel": {
+      "knows": [
+        "House Merrow owns the charter hull of The Redwing on paper.",
+        "The barge was supposed to unload upriver at Blackmarsh Reach, not drift back down to Port Vane."
+      ],
+      "does_not_know": [
+        "That the barge's coal hold actually conceals mislabeled salt-crates.",
+        "Where the Redwing's three-man crew went."
+      ],
+      "falsely_believes": [
+        "Believes House Vesper hired river wreckers to torch a Merrow collier."
+      ]
+    },
+    "elena_reed": {
+      "knows": [
+        "She bought cheap lamp-tallow from a frightened deckhand near the Lantern Quay two evenings ago.",
+        "Oil-of-turpentine and pine pitch burn pale blue around damp oak planks, unlike coal smoke."
+      ],
+      "does_not_know": [
+        "The name of the vessel that deckhand served on.",
+        "That House Merrow and House Vesper are both circling Pier Seven this morning."
+      ],
+      "falsely_believes": [
+        "Believes Corin Hale's new Excise posting is mostly dull paper-stamping."
+      ]
+    }
+  },
+  "rumors_and_beliefs": [
+    {
+      "id": "RUMOR-01",
+      "claim": "The Redwing's crew jumped ship off Blackmarsh Reach after seeing marsh-lights near the sunken lock.",
+      "believed_by": "Night-shift chainmen and Lower Quay ferrymen",
+      "veracity": "verified_false",
+      "origin": "Tavern gossip along the Lantern Quay before dawn"
+    },
+    {
+      "id": "RUMOR-02",
+      "claim": "House Vesper and House Merrow are quietly splitting a contraband copper shipment to avoid royal duty.",
+      "believed_by": "Dock porters and rival small-craft captains",
+      "veracity": "partially_true",
+      "origin": "Loose talk from tally clerks at the Outer Wharf"
+    },
+    {
+      "id": "RUMOR-03",
+      "claim": "Anyone caught holding an unauthorized crimson wax stamp gets sent straight to the mud-barges at Saltmire.",
+      "believed_by": "Junior customs clerks and apprentices",
+      "veracity": "exaggerated",
+      "origin": "Cautionary warning passed down by senior Excise clerks"
+    }
+  ],
+  "unresolved_mysteries": [
+    {
+      "id": "MYSTERY-01",
+      "title": "The Crimson Wax Stamp & False Salt-Crates",
+      "secret_truth": "The crimson wax die belongs to Maren Vesper's private cellar ledger. Beneath the top layer of coarse salt, the crates pack untaxed black-powder barrels bound for a coastal privateer.",
+      "discovered": false,
+      "discovery_conditions": "Pry open a crimson-stamped salt-crate aboard The Redwing or compare the wax grain with Elena Reed's reagent tests and Vesper ledger seals."
+    },
+    {
+      "id": "MYSTERY-02",
+      "title": "The Vanished Crew of The Redwing",
+      "secret_truth": "The barge's skipper and two deckhands were paid off and ferried ashore at Ashwater Bend before hired hands set the wheelhouse alight with pine pitch to destroy the true manifest.",
+      "discovered": false,
+      "discovery_conditions": "Track down the frightened deckhand who sold lamp-tallow near the Lantern Quay or match the charred mooring rope knots at Pier Seven."
+    },
+    {
+      "id": "MYSTERY-03",
+      "title": "Tomas Vesper's Blank Dock-Passes",
+      "secret_truth": "Tomas Vesper unwittingly handed over two stamped Harbor Excise blank passes to pay his gambling debt, and one of those passes cleared The Redwing past the upriver toll-chain.",
+      "discovered": false,
+      "discovery_conditions": "Reconstruct the missing serial numbers in the Pier Seven counter-ledger or press Tomas Vesper with proof from the Cinder Ledger."
+    }
+  ]
+}

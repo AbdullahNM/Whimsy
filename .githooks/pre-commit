@@ -15,7 +15,10 @@
 
 set -uo pipefail
 
-ALLOWED_CAMPAIGN="CAMPAIGNS/template_campaign/"
+ALLOWED_CAMPAIGNS=(
+  "CAMPAIGNS/template_campaign/"
+  "CAMPAIGNS/sample_campaign/"
+)
 
 # Paths that must never exist in the public repo at all.
 FORBIDDEN_ROOTS=(
@@ -30,10 +33,15 @@ while IFS= read -r path; do
 
   case "$path" in
     CAMPAIGNS/*)
-      case "$path" in
-        "$ALLOWED_CAMPAIGN"*) ;;          # template campaign is public
-        *) violations+=("$path") ;;
-      esac
+      allowed=false
+      for ok_prefix in "${ALLOWED_CAMPAIGNS[@]}"; do
+        case "$path" in
+          "$ok_prefix"*) allowed=true ;;
+        esac
+      done
+      if [ "$allowed" = false ]; then
+        violations+=("$path")
+      fi
       ;;
   esac
 

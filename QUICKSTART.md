@@ -197,10 +197,32 @@ The Engine and Docker setup support the following environment variables:
 | `ANTIGRAVITY_PORT` | `8000` | Engine / Docker | Port number the Python Engine HTTP server binds to. |
 | `PYTHONUNBUFFERED` | `1` | Engine / Docker | Forces stdout and stderr streams to be unbuffered for instant console logging. |
 | `WHIMSY_MODEL` | *(unset)* | Engine | Model identifier to override the default LLM model for cloud generation. |
-| `OPENROUTER_API_KEY` | *(unset)* | Engine | API key for OpenRouter LLM completions (Tier 3 live generation). |
+| `OPENROUTER_API_KEY` | *(unset)* | Engine | API key for OpenRouter LLM completions. |
 | `OPENROUTER_MODEL` | `anthropic/claude-3.5-sonnet` | Engine | Target model identifier when using OpenRouter. |
+| `FASTROUTER_API_KEY` | *(unset)* | Engine | API key for FastRouter (`https://api.fastrouter.ai/api/v1/chat/completions`). |
+| `FASTROUTER_MODEL` | `openai/gpt-4o-mini` | Engine | Target model identifier when using FastRouter. |
+| `WHIMSY_PROVIDER` | *(auto)* | Engine | Optional explicit provider override (`openrouter`, `fastrouter`, `gemini`, `custom`). |
+| `WHIMSY_API_BASE` | *(unset)* | Engine | Custom OpenAI-compatible chat completions endpoint URL. |
 | `GEMINI_API_KEY` | *(unset)* | Engine | API key for Google Gemini completions. |
 | `WHIMSY_CHANNEL_MODE` | `auto` | Engine | Agent channel routing mode (`auto`, `direct`, `mock`). |
+
+---
+
+## Sample Campaign & Demo Walkthrough (`sample_campaign`)
+
+Whimsy ships with a pre-built public sample campaign — **The Cinder Ledger** (`CAMPAIGNS/sample_campaign/`) — initialized with 5 played turns so it opens right at **Turn 6** in the middle of a dockside standoff.
+
+1. Start the engine and UI:
+   ```bash
+   # Terminal 1 (set OPENROUTER_API_KEY or FASTROUTER_API_KEY, or enter it in the UI Settings modal)
+   python ENGINE/engine.py
+
+   # Terminal 2
+   python -m http.server 3000 --directory UI
+   ```
+2. Open [http://localhost:3000](http://localhost:3000) and walk through the first-time **Guide** popup (or dismiss it anytime).
+3. Click **Settings** (gear icon), select **Tier 2: Local Python Engine**, pick **OpenRouter** or **FastRouter**, paste your API key, and click **Test Connection**.
+4. Play Turn 6+ using the bottom choice grid (or keys `1`–`4`), optionally add a `[RECAL]` nuance, and open the **Shadow GM** sidebar tab to inspect `IDEAS/agent_channel.md` or send a live steering directive to the Active GM.
 
 ---
 
