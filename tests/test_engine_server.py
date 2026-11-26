@@ -541,6 +541,14 @@ class TestEngineServer(unittest.TestCase):
             self.assertIn("Energy: 70 / 100", data["response"])
             self.assertIn("Turn 6", data["response"])
 
+            # Verify committed disk status.json and status.md advance to Turn 6 (not stuck at Turn 5)
+            with open(os.path.join(cdir, "GAMEPLAY", "status.json"), "r", encoding="utf-8") as sf:
+                disk_status = json.load(sf)
+            with open(os.path.join(cdir, "GAMEPLAY", "status.md"), "r", encoding="utf-8") as smf:
+                disk_status_md = smf.read()
+            self.assertEqual(disk_status["turn"], 6)
+            self.assertRegex(disk_status_md, r"(?i)turn\*{0,2}:\*{0,2}\s*6\b")
+
     def test_origin_auth_and_filesystem_path_containment(self):
         import tempfile
 

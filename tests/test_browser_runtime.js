@@ -486,3 +486,46 @@ test('Browser Runtime - Service Worker restricts caching strictly to same-origin
   assert.strictEqual(makeEvent('http://localhost:8000/index.html', 'GET'), false, 'cross-origin must not be intercepted');
   assert.strictEqual(makeEvent('http://localhost:3000/generate', 'POST'), false);
 });
+
+test('Browser Runtime - Mobile viewport auto-collapses sidebar on startup', () => {
+  const vm = require('vm');
+  const appPath = path.resolve(__dirname, '../UI/app.js');
+  const appCode = fs.readFileSync(appPath, 'utf8');
+  const classes = new Set();
+  const sidebarEl = {
+    id: 'sidebar',
+    classList: {
+      add: (c) => classes.add(c),
+      remove: (c) => classes.delete(c),
+      toggle: (c) => (classes.has(c) ? classes.delete(c) : classes.add(c)),
+      contains: (c) => classes.has(c)
+    },
+    addEventListener: () => {}
+  };
+  const noopEl = {
+    value: '',
+    textContent: '',
+    style: {},
+    classList: { add: () => {}, remove: () => {}, toggle: () => {}, contains: () => false },
+    addEventListener: () => {}
+  };
+  const ctx = {
+    window: { innerWidth: 390 },
+    navigator: {},
+    document: {
+      getElementById: (id) => (id === 'sidebar' ? sidebarEl : { ...noopEl, id }),
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      createElement: () => ({ ...noopEl }),
+      addEventListener: () => {}
+    },
+    localStorage: { getItem: () => null, setItem: () => {} },
+    fetch: () => Promise.resolve({ ok: true, json: () => Promise.resolve({}) }),
+    console: { log: () => {}, error: () => {}, warn: () => {} },
+    setTimeout: () => {},
+    clearTimeout: () => {}
+  };
+  vm.createContext(ctx);
+  vm.runInContext(appCode, ctx);
+  assert.ok(classes.has('collapsed'), 'sidebar must start collapsed at 390px mobile width');
+});

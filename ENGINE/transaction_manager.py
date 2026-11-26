@@ -733,12 +733,38 @@ class TransactionManager:
                 for k, v in next_state.items():
                     status_json[k] = copy.deepcopy(v)
 
+        # Preserve authoritative post-resolution turn from staged outcome / next_state
+        authoritative_turn = None
+        if staged_status is not None and isinstance(staged_status.get("turn"), int):
+            authoritative_turn = staged_status["turn"]
+        elif isinstance(metadata, dict):
+            outcome_data = metadata.get("outcome")
+            next_state = (
+                outcome_data.next_state
+                if hasattr(outcome_data, "next_state") and isinstance(outcome_data.next_state, dict)
+                else (outcome_data.get("next_state") if isinstance(outcome_data, dict) else metadata.get("next_state"))
+            )
+            if isinstance(next_state, dict) and isinstance(next_state.get("turn"), int):
+                authoritative_turn = next_state["turn"]
+
         # 3. Parse deltas via StateParser
         new_status_md, new_items_md, _ = StateParser.apply_state_mutations(gm_output, status_md, items_md)
         new_status_json, _ = StateParser.apply_state_mutations_json(gm_output, status_json)
 
-        new_status_json["turn"] = turn
+        if authoritative_turn is not None:
+            new_status_json["turn"] = authoritative_turn
+        elif not isinstance(new_status_json.get("turn"), int) or new_status_json["turn"] < turn:
+            new_status_json["turn"] = turn
         new_status_json["transaction_id"] = self.current_transaction_id
+
+        # Keep status.md Turn line synchronized with authoritative status.json turn
+        if new_status_md and isinstance(new_status_json.get("turn"), int):
+            new_status_md = re.sub(
+                r'(\bTurn\*{0,2}:\*{0,2}\s*)\d+',
+                rf'\g<1>{new_status_json["turn"]}',
+                new_status_md,
+                flags=re.IGNORECASE
+            )
 
         # 4. Stage updates
         self.stage("status.json", new_status_json)
@@ -1093,7 +1119,10 @@ class TransactionManager:
                     pass
             if isinstance(status_val, dict):
                 status_val["transaction_id"] = self.current_transaction_id
-                if self.current_turn is not None:
+                if self.current_turn is not None and (
+                    not isinstance(status_val.get("turn"), int)
+                    or status_val["turn"] < self.current_turn
+                ):
                     status_val["turn"] = self.current_turn
                 self.staged_files["GAMEPLAY/status.json"] = status_val
 
