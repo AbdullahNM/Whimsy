@@ -63,13 +63,18 @@ function setNestedValue(obj, path, value) {
 
 function escapeHtml(str) {
   if (typeof str !== 'string') return str;
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
-// Robust, non-greedy Markdown parser
+// Robust, non-greedy Markdown parser (HTML-escaped before tag formatting)
 function parseInlineMarkdown(text) {
   if (!text) return '';
-  return text
+  return escapeHtml(text)
     .replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')
     .replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>')
     .replace(/__([^_]+?)__/g, '<strong>$1</strong>')
@@ -84,15 +89,28 @@ function renderMarkdown(text) {
   const codeBlocks = [];
   let processed = text.replace(/```([a-z0-9_-]*)\n([\s\S]*?)```/gim, (match, lang, code) => {
     const idx = codeBlocks.length;
-    codeBlocks.push(`<pre class="code-block"><code class="lang-${lang}">${escapeHtml(code.trim())}</code></pre>`);
+    codeBlocks.push(`<pre class="code-block"><code class="lang-${escapeHtml(lang)}">${escapeHtml(code.trim())}</code></pre>`);
     return `%%CODEBLOCK_${idx}%%`;
   });
 
-  // 2. Extract and format receipts & system blocks
+  // 2. Extract and format receipts & system blocks safely (escaped inside tag)
+  const receiptBlocks = [];
   processed = processed
-    .replace(/\[(XP RESOLUTION:[\s\S]*?)\]/gi, '<div class="receipt-block"><span class="receipt-tag">[$1]</span></div>')
-    .replace(/\[(CURRENCY RESOLUTION:[\s\S]*?)\]/gi, '<div class="receipt-block"><span class="receipt-tag">[$1]</span></div>')
-    .replace(/\[(SYS:[\s\S]*?)\]/gi, '<div class="receipt-block sys-block"><span class="receipt-tag">[$1]</span></div>');
+    .replace(/\[(XP RESOLUTION:[\s\S]*?)\]/gi, (match, inner) => {
+      const idx = receiptBlocks.length;
+      receiptBlocks.push(`<div class="receipt-block"><span class="receipt-tag">[${escapeHtml(inner)}]</span></div>`);
+      return `%%RECEIPTBLOCK_${idx}%%`;
+    })
+    .replace(/\[(CURRENCY RESOLUTION:[\s\S]*?)\]/gi, (match, inner) => {
+      const idx = receiptBlocks.length;
+      receiptBlocks.push(`<div class="receipt-block"><span class="receipt-tag">[${escapeHtml(inner)}]</span></div>`);
+      return `%%RECEIPTBLOCK_${idx}%%`;
+    })
+    .replace(/\[(SYS:[\s\S]*?)\]/gi, (match, inner) => {
+      const idx = receiptBlocks.length;
+      receiptBlocks.push(`<div class="receipt-block sys-block"><span class="receipt-tag">[${escapeHtml(inner)}]</span></div>`);
+      return `%%RECEIPTBLOCK_${idx}%%`;
+    });
 
   // 3. Process line-by-line block elements
   const lines = processed.split('\n');
@@ -102,6 +120,14 @@ function renderMarkdown(text) {
 
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i];
+
+    // Preserved code or receipt blocks
+    if (line.trim().startsWith('%%CODEBLOCK_') || line.trim().startsWith('%%RECEIPTBLOCK_')) {
+      if (inUl) { outputLines.push('</ul>'); inUl = false; }
+      if (inOl) { outputLines.push('</ol>'); inOl = false; }
+      outputLines.push(line);
+      continue;
+    }
 
     // Horizontal rule: --- or === or ***
     if (/^(\s*[-*_]){3,}\s*$/.test(line) || /^={10,}\s*$/.test(line)) {
@@ -199,12 +225,6 @@ function renderMarkdown(text) {
       continue;
     }
 
-    // Codeblock placeholder or empty line
-    if (line.includes('%%CODEBLOCK_')) {
-      outputLines.push(line);
-      continue;
-    }
-
     if (!line.trim()) {
       continue;
     }
@@ -217,7 +237,10 @@ function renderMarkdown(text) {
 
   let result = outputLines.join('\n');
 
-  // Restore preserved code blocks
+  // Restore preserved receipts and code blocks
+  receiptBlocks.forEach((rb, idx) => {
+    result = result.replace(`%%RECEIPTBLOCK_${idx}%%`, rb);
+  });
   codeBlocks.forEach((cb, idx) => {
     result = result.replace(`%%CODEBLOCK_${idx}%%`, cb);
   });
@@ -2792,7 +2815,7 @@ function setupShadowNarrator() {
       const zoom = pacing.zoom_level || 'detailed_scene';
       const intensity = pacing.narrative_intensity !== undefined ? pacing.narrative_intensity : 1;
       const directive = `Honor player steering ("${query}") at zoom '${zoom}' and intensity ${intensity}/5.`;
-      const advice = `**Shadow Narrator Advisory** (Browser Mode):\n\n- **Focus & Intensity**: ${zoom} • Level ${intensity}/5\n- **Steering**: *${escapeHtml(query)}*\n\n**Active GM Directive**: ${escapeHtml(directive)}`;
+      const advice = `**Shadow Narrator Advisory** (Browser Mode):\n\n- **Focus & Intensity**: ${zoom} • Level ${intensity}/5\n- **Steering**: *${query}*\n\n**Active GM Directive**: ${directive}`;
       resultBox.innerHTML = renderMarkdown(advice);
       if (postToChannel) {
         campaignData.agentChannel = [...(campaignData.agentChannel || []), {

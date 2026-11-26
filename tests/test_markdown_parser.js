@@ -239,3 +239,27 @@ Fog drifts across the harbor pier.
   assert.ok(cleanNarrative.includes('Fog drifts across the harbor pier.'));
   assert.ok(receipts.some(r => r.includes('System State Delta')));
 });
+
+test('Markdown Parser - Escapes raw HTML / XSS payloads across prose, headings, lists, blockquotes, and receipts', () => {
+  const malicious = [
+    '# Heading <img src=x onerror=alert(1)>',
+    '',
+    'Paragraph with **bold** and <script>alert(2)</script> and `<b onclick=x()>inline</b>`.',
+    '',
+    '- <svg onload=alert(3)> bullet',
+    '> Quote <iframe src="javascript:alert(4)">',
+    '[SYS: Turn 7 | <img src=x onerror=alert(5)>]'
+  ].join('\n');
+
+  const html = renderMarkdown(malicious);
+  assert.ok(!html.includes('<img'), 'raw <img> must be escaped');
+  assert.ok(!html.includes('<script'), 'raw <script> must be escaped');
+  assert.ok(!html.includes('<svg'), 'raw <svg> must be escaped');
+  assert.ok(!html.includes('<iframe'), 'raw <iframe> must be escaped');
+  assert.ok(!html.includes('<b '), 'raw <b> inside inline code must be escaped');
+  assert.ok(html.includes('<strong>bold</strong>'));
+  assert.ok(html.includes('&lt;script&gt;alert(2)&lt;/script&gt;'));
+  assert.ok(html.includes('<code class="inline-code">&lt;b onclick=x()&gt;inline&lt;/b&gt;</code>'));
+  assert.ok(html.includes('<blockquote>Quote &lt;iframe src=&quot;javascript:alert(4)&quot;&gt;</blockquote>'));
+  assert.ok(html.includes('<div class="receipt-block sys-block"><span class="receipt-tag">[SYS: Turn 7 | &lt;img src=x onerror=alert(5)&gt;]</span></div>'));
+});

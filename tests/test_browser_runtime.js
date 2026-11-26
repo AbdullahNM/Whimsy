@@ -444,3 +444,45 @@ test('Browser Runtime - LocalNarrator requires pre-turn state, preserves explici
     }
   });
 });
+
+test('Browser Runtime - Service Worker restricts caching strictly to same-origin static assets', () => {
+  const vm = require('vm');
+  const swPath = path.resolve(__dirname, '../UI/sw.js');
+  const swCode = fs.readFileSync(swPath, 'utf8');
+  const listeners = {};
+  const ctx = {
+    URL,
+    self: {
+      location: { href: 'http://localhost:3000/sw.js', origin: 'http://localhost:3000' },
+      addEventListener: (ev, fn) => { listeners[ev] = fn; },
+      skipWaiting: () => {},
+      clients: { claim: () => {} }
+    },
+    caches: {
+      open: async () => ({ addAll: async () => {}, put: async () => {} }),
+      match: async () => null,
+      keys: async () => [],
+      delete: async () => {}
+    },
+    fetch: async () => ({ status: 200, type: 'basic', clone: () => ({}) })
+  };
+  vm.createContext(ctx);
+  vm.runInContext(swCode, ctx);
+
+  assert.strictEqual(typeof listeners.fetch, 'function');
+  const makeEvent = (url, method = 'GET') => {
+    let responded = false;
+    listeners.fetch({
+      request: { url, method, mode: 'cors', headers: { get: () => '' } },
+      respondWith: () => { responded = true; }
+    });
+    return responded;
+  };
+
+  assert.strictEqual(makeEvent('http://localhost:3000/index.html', 'GET'), true);
+  assert.strictEqual(makeEvent('http://localhost:3000/app.js', 'GET'), true);
+  assert.strictEqual(makeEvent('http://localhost:3000/api/campaign?campaign=private_camp', 'GET'), false);
+  assert.strictEqual(makeEvent('http://localhost:3000/api/campaigns', 'GET'), false);
+  assert.strictEqual(makeEvent('http://localhost:8000/index.html', 'GET'), false, 'cross-origin must not be intercepted');
+  assert.strictEqual(makeEvent('http://localhost:3000/generate', 'POST'), false);
+});

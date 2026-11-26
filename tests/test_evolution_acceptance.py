@@ -18,6 +18,7 @@ import json
 import shutil
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR not in sys.path:
@@ -40,6 +41,9 @@ from tests.test_engine_server import execute_request
 class TestEvolutionAcceptance(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
+        self._root_patch = patch("ENGINE.engine.ROOT_DIR", self.test_dir)
+        self._root_patch.start()
+        self.addCleanup(self._root_patch.stop)
         self.campaigns_root = os.path.join(self.test_dir, "CAMPAIGNS")
         self.campaign_dir = os.path.join(self.campaigns_root, "acceptance_campaign")
         self.gameplay_dir = os.path.join(self.campaign_dir, "GAMEPLAY")

@@ -22,6 +22,8 @@ import sys
 import json
 import time
 import copy
+import re
+import hmac
 import urllib.request
 import urllib.error
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -220,6 +222,9 @@ def _read_json_safe(path: str):
     return None
 
 
+VALID_CAMPAIGN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+
+
 def _is_campaign_api_allowed(campaign_id: str) -> bool:
     """Allow public bundled campaigns over CORS HTTP by default; private campaigns require explicit opt-in."""
     if os.environ.get("WHIMSY_ALLOW_PRIVATE_CAMPAIGN_API") == "1":
@@ -227,32 +232,126 @@ def _is_campaign_api_allowed(campaign_id: str) -> bool:
     return campaign_id in PUBLIC_BUNDLED_CAMPAIGNS
 
 
+def _is_allowed_origin(origin: str) -> bool:
+    """Allow requests from local loopback origins or explicitly configured WHIMSY_ALLOWED_ORIGINS."""
+    if not origin:
+        return True
+    origin = origin.strip()
+    allowed_env = [o.strip() for o in os.environ.get("WHIMSY_ALLOWED_ORIGINS", "").split(",") if o.strip()]
+    if origin in allowed_env:
+        return True
+    if origin == "null":
+        return os.environ.get("WHIMSY_ALLOW_NULL_ORIGIN") == "1"
+    from urllib.parse import urlparse
+    parsed = urlparse(origin)
+    return parsed.scheme in ("http", "https") and parsed.hostname in ("localhost", "127.0.0.1", "::1")
+
+
+def _allowed_campaign_roots() -> list[str]:
+    """Return canonical configured workspace roots allowed to host CAMPAIGNS/ directories."""
+    roots = [os.path.realpath(ROOT_DIR)]
+    sibling_campaigns_parent = os.path.realpath(os.path.join(os.path.dirname(ROOT_DIR), "whimsy-campaigns"))
+    if os.path.isdir(sibling_campaigns_parent):
+        roots.append(sibling_campaigns_parent)
+    extra_roots = os.environ.get("WHIMSY_ALLOWED_CAMPAIGN_ROOTS", "")
+    for raw in extra_roots.split(os.pathsep):
+        raw = raw.strip()
+        if raw and os.path.isdir(raw):
+            real_raw = os.path.realpath(raw)
+            if real_raw not in roots:
+                roots.append(real_raw)
+    return roots
+
+
+def _is_within_dir(target_path: str, base_dir: str) -> bool:
+    real_target = os.path.realpath(target_path)
+    real_base = os.path.realpath(base_dir)
+    try:
+        return os.path.commonpath([real_target, real_base]) == real_base
+    except ValueError:
+        return False
+
+
+def _resolve_campaign_paths(
+    campaign: str = "",
+    req_campaign_dir: str = None,
+    req_root_dir: str = None,
+) -> tuple[str | None, str]:
+    """Resolve and constrain request-supplied campaign paths to configured campaign roots."""
+    allowed_roots = _allowed_campaign_roots()
+    workspace_root = os.path.realpath(ROOT_DIR)
+
+    if req_root_dir:
+        real_req_root = os.path.realpath(str(req_root_dir))
+        if real_req_root not in allowed_roots:
+            raise ValueError("Requested root_dir is outside configured campaign roots.")
+        workspace_root = real_req_root
+
+    if campaign and not VALID_CAMPAIGN_ID_RE.match(str(campaign)):
+        raise ValueError(f"Invalid campaign identifier: '{campaign}'")
+
+    if req_campaign_dir:
+        real_cdir = os.path.realpath(str(req_campaign_dir))
+        matched_root = None
+        for root in allowed_roots:
+            campaigns_base = os.path.realpath(os.path.join(root, "CAMPAIGNS"))
+            if os.path.dirname(real_cdir) == campaigns_base and VALID_CAMPAIGN_ID_RE.match(os.path.basename(real_cdir)):
+                matched_root = root
+                break
+        if matched_root is None:
+            raise ValueError("Requested campaign_dir is outside configured campaign roots.")
+        if campaign and os.path.basename(real_cdir) != str(campaign):
+            raise ValueError("Requested campaign_dir does not match campaign identifier.")
+        if not req_root_dir:
+            workspace_root = matched_root
+        return real_cdir, workspace_root
+
+    if campaign:
+        campaigns_base = os.path.realpath(os.path.join(workspace_root, "CAMPAIGNS"))
+        cand = os.path.realpath(os.path.join(campaigns_base, str(campaign)))
+        if os.path.dirname(cand) != campaigns_base:
+            raise ValueError("Resolved campaign directory escapes CAMPAIGNS root.")
+        if os.path.isdir(cand):
+            return cand, workspace_root
+        sibling_dir = os.path.realpath(os.path.join(os.path.dirname(ROOT_DIR), "whimsy-campaigns"))
+        if sibling_dir in allowed_roots:
+            sib_cand = os.path.realpath(os.path.join(sibling_dir, str(campaign)))
+            if os.path.dirname(sib_cand) == sibling_dir and os.path.isdir(sib_cand):
+                return sib_cand, workspace_root
+
+    return None, workspace_root
+
+
 def list_workspace_campaigns(root_dir: str) -> list[dict]:
     """List exposed campaigns with valid campaign_config.json under CAMPAIGNS/."""
-    campaigns_dir = os.path.join(root_dir, "CAMPAIGNS")
+    campaigns_dir = os.path.realpath(os.path.join(root_dir, "CAMPAIGNS"))
     items = []
     if not os.path.isdir(campaigns_dir):
         return items
     for name in sorted(os.listdir(campaigns_dir)):
-        if not _is_campaign_api_allowed(name):
+        if not VALID_CAMPAIGN_ID_RE.match(name) or not _is_campaign_api_allowed(name):
             continue
-        cdir = os.path.join(campaigns_dir, name)
-        cfg_path = os.path.join(cdir, "campaign_config.json")
-        if os.path.isdir(cdir) and os.path.isfile(cfg_path):
-            cfg = _read_json_safe(cfg_path)
-            if isinstance(cfg, dict):
-                cid = cfg.get("id", name)
-                if _is_campaign_api_allowed(cid):
-                    items.append({"id": cid, "config": cfg})
+        cdir = os.path.realpath(os.path.join(campaigns_dir, name))
+        if os.path.dirname(cdir) != campaigns_dir or not os.path.isdir(cdir):
+            continue
+        cfg_path = os.path.realpath(os.path.join(cdir, "campaign_config.json"))
+        if os.path.dirname(cfg_path) != cdir or not os.path.isfile(cfg_path):
+            continue
+        cfg = _read_json_safe(cfg_path)
+        if isinstance(cfg, dict):
+            cid = cfg.get("id", name)
+            if _is_campaign_api_allowed(cid):
+                items.append({"id": cid, "config": cfg})
     return items
 
 
 def load_campaign_bundle(root_dir: str, campaign_id: str) -> dict | None:
     """Load full disk state for a campaign so the browser UI can hydrate without FSA."""
-    if not campaign_id or ".." in campaign_id or "/" in campaign_id or "\\" in campaign_id:
+    if not campaign_id or not VALID_CAMPAIGN_ID_RE.match(campaign_id):
         return None
-    cdir = os.path.join(root_dir, "CAMPAIGNS", campaign_id)
-    if not os.path.isdir(cdir):
+    campaigns_dir = os.path.realpath(os.path.join(root_dir, "CAMPAIGNS"))
+    cdir = os.path.realpath(os.path.join(campaigns_dir, campaign_id))
+    if os.path.dirname(cdir) != campaigns_dir or not os.path.isdir(cdir):
         return None
 
     cfg = _read_json_safe(os.path.join(cdir, "campaign_config.json"))
@@ -324,13 +423,43 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
 
     def _set_cors_headers(self, status=200, content_type="application/json"):
         self.send_response(status)
-        self.send_header("Access-Control-Allow-Origin", "*")
+        headers = getattr(self, "headers", None)
+        origin = headers.get("Origin") if headers else None
+        if origin:
+            if _is_allowed_origin(origin):
+                self.send_header("Access-Control-Allow-Origin", origin)
+                self.send_header("Vary", "Origin")
+        else:
+            self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
         self.send_header("Content-Type", content_type)
         self.end_headers()
 
+    def _authorize_request(self, allow_public: bool = False) -> bool:
+        headers = getattr(self, "headers", None)
+        origin = headers.get("Origin") if headers else None
+        if origin and not _is_allowed_origin(origin) and not allow_public:
+            self._set_cors_headers(403)
+            self.wfile.write(json.dumps({"error": "Origin not allowed."}).encode("utf-8"))
+            return False
+
+        configured_token = (os.environ.get("WHIMSY_AUTH_TOKEN") or "").strip()
+        if configured_token and not allow_public:
+            auth_header = (headers.get("Authorization") or "") if headers else ""
+            supplied = auth_header[7:].strip() if auth_header.lower().startswith("bearer ") else ""
+            if not supplied or not hmac.compare_digest(supplied, configured_token):
+                self._set_cors_headers(401)
+                self.wfile.write(json.dumps({"error": "Missing or invalid authorization token."}).encode("utf-8"))
+                return False
+        return True
+
     def do_OPTIONS(self):
+        headers = getattr(self, "headers", None)
+        origin = headers.get("Origin") if headers else None
+        if origin and not _is_allowed_origin(origin):
+            self._set_cors_headers(403)
+            return
         self._set_cors_headers(204)
 
     def do_GET(self):
@@ -357,6 +486,8 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
             }
             self.wfile.write(json.dumps(status_data).encode("utf-8"))
         elif self.path in ["/v1/models", "/api/models"]:
+            if not self._authorize_request():
+                return
             self._set_cors_headers(200)
             models_data = {
                 "object": "list",
@@ -372,6 +503,8 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
             }
             self.wfile.write(json.dumps(models_data).encode("utf-8"))
         elif self.path in ["/campaigns", "/api/campaigns"]:
+            if not self._authorize_request():
+                return
             campaigns = list_workspace_campaigns(ROOT_DIR)
             self._set_cors_headers(200)
             self.wfile.write(json.dumps({
@@ -379,9 +512,15 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
                 "configs": {c["id"]: c["config"] for c in campaigns}
             }).encode("utf-8"))
         elif self.path.startswith("/api/campaign?") or self.path.startswith("/campaign?"):
+            if not self._authorize_request():
+                return
             from urllib.parse import urlparse, parse_qs
             query = parse_qs(urlparse(self.path).query)
             campaign = query.get("campaign", ["template_campaign"])[0]
+            if not VALID_CAMPAIGN_ID_RE.match(campaign):
+                self._set_cors_headers(400)
+                self.wfile.write(json.dumps({"error": "Invalid campaign identifier."}).encode("utf-8"))
+                return
             if not _is_campaign_api_allowed(campaign):
                 self._set_cors_headers(403)
                 self.wfile.write(json.dumps({"error": "Private campaign bundle access is disabled over HTTP."}).encode("utf-8"))
@@ -394,10 +533,20 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
             self._set_cors_headers(200)
             self.wfile.write(json.dumps(bundle).encode("utf-8"))
         elif self.path.startswith("/telemetry") or self.path.startswith("/api/telemetry"):
+            if not self._authorize_request():
+                return
             from urllib.parse import urlparse, parse_qs
             from ENGINE.telemetry import get_campaign_telemetry_summary, read_campaign_telemetry
             query = parse_qs(urlparse(self.path).query)
             campaign = query.get("campaign", ["template_campaign"])[0]
+            if not VALID_CAMPAIGN_ID_RE.match(campaign):
+                self._set_cors_headers(400)
+                self.wfile.write(json.dumps({"error": "Invalid campaign identifier."}).encode("utf-8"))
+                return
+            if not _is_campaign_api_allowed(campaign):
+                self._set_cors_headers(403)
+                self.wfile.write(json.dumps({"error": "Private campaign telemetry access is disabled over HTTP."}).encode("utf-8"))
+                return
             summary = get_campaign_telemetry_summary(ROOT_DIR, campaign)
             records = read_campaign_telemetry(ROOT_DIR, campaign)
             self._set_cors_headers(200)
@@ -407,10 +556,20 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
                 "records": records
             }).encode("utf-8"))
         elif self.path.startswith("/calibration") or self.path.startswith("/api/calibration"):
+            if not self._authorize_request():
+                return
             from urllib.parse import urlparse, parse_qs
             from ENGINE.calibration import get_calibration_advisory
             query = parse_qs(urlparse(self.path).query)
             campaign = query.get("campaign", ["template_campaign"])[0]
+            if not VALID_CAMPAIGN_ID_RE.match(campaign):
+                self._set_cors_headers(400)
+                self.wfile.write(json.dumps({"error": "Invalid campaign identifier."}).encode("utf-8"))
+                return
+            if not _is_campaign_api_allowed(campaign):
+                self._set_cors_headers(403)
+                self.wfile.write(json.dumps({"error": "Private campaign calibration access is disabled over HTTP."}).encode("utf-8"))
+                return
             advisory = get_calibration_advisory(ROOT_DIR, campaign)
             self._set_cors_headers(200)
             self.wfile.write(json.dumps({
@@ -418,6 +577,8 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
                 "calibration": advisory.to_dict()
             }).encode("utf-8"))
         elif self.path.startswith("/api/channel"):
+            if not self._authorize_request():
+                return
             from urllib.parse import urlparse, parse_qs
             from ENGINE.agent_channel import AgentChannelManager
             query = parse_qs(urlparse(self.path).query)
@@ -425,9 +586,18 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
             role = query.get("role", [None])[0]
             mode = query.get("mode", [None])[0]
 
-            campaign_dir = os.path.join(ROOT_DIR, "CAMPAIGNS", campaign)
-            if not os.path.isdir(campaign_dir):
-                campaign_dir = os.path.join(os.path.dirname(ROOT_DIR), "whimsy-campaigns", campaign)
+            try:
+                campaign_dir, workspace_root = _resolve_campaign_paths(campaign)
+            except ValueError as ve:
+                self._set_cors_headers(400)
+                self.wfile.write(json.dumps({"error": str(ve)}).encode("utf-8"))
+                return
+            if not _is_campaign_api_allowed(campaign):
+                self._set_cors_headers(403)
+                self.wfile.write(json.dumps({"error": "Private campaign channel access is disabled over HTTP."}).encode("utf-8"))
+                return
+            if not campaign_dir:
+                campaign_dir = os.path.realpath(os.path.join(workspace_root, "CAMPAIGNS", campaign))
 
             manager = AgentChannelManager(campaign_dir, channel_mode=mode)
             messages = manager.load_messages()
@@ -449,6 +619,8 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({"error": "Endpoint not found"}).encode("utf-8"))
 
     def do_POST(self):
+        if not self._authorize_request():
+            return
         if self.path in ["/generate", "/v1/chat/completions", "/api/turn"]:
             t_gen_start = time.time()
             content_length = int(self.headers.get("Content-Length", 0))
@@ -471,21 +643,20 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
             except (ValueError, TypeError):
                 turn_num = 1
 
-            # Resolve campaign workspace directory
-            campaign_dir = payload.get("campaign_dir")
-            if not campaign_dir and campaign:
-                cand = os.path.join(ROOT_DIR, "CAMPAIGNS", campaign)
-                if os.path.isdir(cand):
-                    campaign_dir = cand
-
-            # Resolve workspace root directory if custom campaign_dir is supplied
-            workspace_root = ROOT_DIR
-            if campaign_dir and os.path.isdir(campaign_dir):
-                parent = os.path.dirname(campaign_dir)
-                if os.path.basename(parent) == "CAMPAIGNS":
-                    workspace_root = os.path.dirname(parent)
-            if payload.get("root_dir"):
-                workspace_root = payload.get("root_dir")
+            # Constrain request-selected filesystem paths strictly to configured campaign roots
+            try:
+                campaign_dir, workspace_root = _resolve_campaign_paths(
+                    campaign=campaign,
+                    req_campaign_dir=payload.get("campaign_dir"),
+                    req_root_dir=payload.get("root_dir"),
+                )
+            except ValueError as ve:
+                self._set_cors_headers(400)
+                self.wfile.write(json.dumps({
+                    "error": "INVALID_PATH",
+                    "message": str(ve),
+                }).encode("utf-8"))
+                return
 
             # Resolve operational mode
             mode = payload.get("operational_mode") or payload.get("mode")
@@ -898,9 +1069,18 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
             recipient = payload.get("recipient")
             mode = payload.get("mode")
 
-            campaign_dir = os.path.join(ROOT_DIR, "CAMPAIGNS", campaign)
-            if not os.path.isdir(campaign_dir):
-                campaign_dir = os.path.join(os.path.dirname(ROOT_DIR), "whimsy-campaigns", campaign)
+            try:
+                campaign_dir, workspace_root = _resolve_campaign_paths(campaign=campaign)
+            except ValueError as ve:
+                self._set_cors_headers(400)
+                self.wfile.write(json.dumps({"error": str(ve)}).encode("utf-8"))
+                return
+            if not _is_campaign_api_allowed(campaign):
+                self._set_cors_headers(403)
+                self.wfile.write(json.dumps({"error": "Private campaign channel access is disabled over HTTP."}).encode("utf-8"))
+                return
+            if not campaign_dir:
+                campaign_dir = os.path.realpath(os.path.join(workspace_root, "CAMPAIGNS", campaign))
 
             manager = AgentChannelManager(campaign_dir, channel_mode=mode)
             updated_messages = manager.post_message(
@@ -949,6 +1129,10 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
                 return
 
             campaign = payload.get("campaign", payload.get("campaign_id", "template_campaign"))
+            if not VALID_CAMPAIGN_ID_RE.match(str(campaign)):
+                self._set_cors_headers(400)
+                self.wfile.write(json.dumps({"error": "Invalid campaign identifier."}).encode("utf-8"))
+                return
             turn_num = payload.get("turn_num", payload.get("turn", 1))
             action = payload.get("action", "")
             response = payload.get("response", payload.get("gm_response", ""))
@@ -979,6 +1163,10 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
                 return
 
             campaign = payload.get("campaign", payload.get("campaign_id", "template_campaign"))
+            if not VALID_CAMPAIGN_ID_RE.match(str(campaign)):
+                self._set_cors_headers(400)
+                self.wfile.write(json.dumps({"error": "Invalid campaign identifier."}).encode("utf-8"))
+                return
             query = payload.get("query", "")
             llm_cfg = resolve_llm_config(payload)
             post_to_channel = bool(payload.get("post_to_channel", False))

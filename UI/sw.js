@@ -50,28 +50,61 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Cache-First strategy with network fallback for local static assets
-self.addEventListener('fetch', (event) => {
-  // Pass cloud and external API calls directly to network
+const STATIC_ASSET_PATHS = new Set(
+  ASSETS_TO_CACHE.map((asset) => {
+    try {
+      return new URL(asset, self.location ? self.location.href : 'http://localhost/').pathname;
+    } catch (e) {
+      return asset.replace(/^\.\//, '/');
+    }
+  })
+);
+
+function isStaticAssetRequest(request) {
+  if (!request || request.method !== 'GET') return false;
+  let url;
+  try {
+    url = new URL(request.url);
+  } catch (e) {
+    return false;
+  }
+  if (self.location && url.origin !== self.location.origin) {
+    return false;
+  }
+  const path = url.pathname;
   if (
-    event.request.url.includes('googleapis.com') ||
-    event.request.url.includes('openrouter.ai') ||
-    event.request.method !== 'GET'
+    path.startsWith('/api/') ||
+    path === '/health' ||
+    path === '/status' ||
+    path === '/generate' ||
+    path === '/campaigns' ||
+    path === '/campaign' ||
+    path.startsWith('/telemetry') ||
+    path.startsWith('/calibration') ||
+    path.startsWith('/shadow') ||
+    path.startsWith('/evaluate') ||
+    path.startsWith('/v1/')
   ) {
+    return false;
+  }
+  return STATIC_ASSET_PATHS.has(path) || path === '/' || path.endsWith('/index.html');
+}
+
+// Cache-First strategy restricted strictly to bundled static UI assets
+self.addEventListener('fetch', (event) => {
+  if (!isStaticAssetRequest(event.request)) {
     return;
   }
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Return cached asset immediately
         return cachedResponse;
       }
 
-      // If not in cache, fetch from network and cache for future offline use
       return fetch(event.request)
         .then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
+          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
             const respClone = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(event.request, respClone);
@@ -80,7 +113,6 @@ self.addEventListener('fetch', (event) => {
           return networkResponse;
         })
         .catch(() => {
-          // If offline and request is for navigation/HTML, return index.html
           if (event.request.mode === 'navigate' || event.request.headers.get('accept')?.includes('text/html')) {
             return caches.match('./index.html');
           }

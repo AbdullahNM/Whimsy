@@ -34,13 +34,57 @@ class CampaignSafetyError(AssertionError):
     pass
 
 
-def read_text(path: str) -> str:
-    with open(path, "r", encoding="utf-8") as f:
+VALID_CAMPAIGN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+
+
+def resolve_authorized_campaign_dir(campaign_id: str, repo_root: str = None) -> tuple[str, str]:
+    """Resolve and validate a campaign directory against CAMPAIGNS/ before reading any files."""
+    root = os.path.realpath(repo_root or ROOT)
+    campaigns_root = os.path.realpath(os.path.join(root, "CAMPAIGNS"))
+
+    if not isinstance(campaign_id, str) or not campaign_id.strip():
+        raise CampaignSafetyError("R9 Violation: campaign_id must be a non-empty string.")
+    if any(delim in campaign_id for delim in [",", ";", "|", " "]):
+        raise CampaignSafetyError(f"R9 Violation: Multiple campaign IDs detected in '{campaign_id}'. Only 1 campaign is allowed per build.")
+    if ".." in campaign_id or "/" in campaign_id or "\\" in campaign_id or not VALID_CAMPAIGN_ID_RE.match(campaign_id):
+        raise CampaignSafetyError(f"R9 Violation: Unauthorized path or invalid campaign ID '{campaign_id}'.")
+
+    camp_dir = os.path.realpath(os.path.join(campaigns_root, campaign_id))
+    try:
+        common = os.path.commonpath([camp_dir, campaigns_root])
+    except ValueError:
+        raise CampaignSafetyError(f"R9 Violation: Campaign path '{camp_dir}' is outside authorized campaigns root.")
+
+    if common != campaigns_root or os.path.dirname(camp_dir) != campaigns_root:
+        raise CampaignSafetyError(f"R9 Violation: Campaign path '{camp_dir}' escapes authorized directory '{campaigns_root}'.")
+    if not os.path.isdir(camp_dir):
+        raise CampaignSafetyError(f"R9 Violation: Campaign directory does not exist or is unauthorized: '{camp_dir}'")
+
+    return root, camp_dir
+
+
+def _assert_path_within(path: str, allowed_root: str) -> str:
+    """Resolve symlinks and verify path stays within allowed_root before opening."""
+    real_root = os.path.realpath(allowed_root)
+    real_path = os.path.realpath(path)
+    try:
+        common = os.path.commonpath([real_path, real_root])
+    except ValueError:
+        raise CampaignSafetyError(f"R9 Violation: Path '{real_path}' is outside authorized root '{real_root}'.")
+    if common != real_root:
+        raise CampaignSafetyError(f"R9 Violation: Path '{real_path}' escapes authorized root '{real_root}'.")
+    return real_path
+
+
+def read_text(path: str, allowed_root: str = None) -> str:
+    target = _assert_path_within(path, allowed_root) if allowed_root else os.path.realpath(path)
+    with open(target, "r", encoding="utf-8") as f:
         return f.read()
 
 
-def read_json_file(path: str) -> dict:
-    with open(path, "r", encoding="utf-8") as f:
+def read_json_file(path: str, allowed_root: str = None) -> dict:
+    target = _assert_path_within(path, allowed_root) if allowed_root else os.path.realpath(path)
+    with open(target, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -162,15 +206,16 @@ def verify_single_campaign_safety(
     if ".." in campaign_id or "/" in campaign_id or "\\" in campaign_id:
         raise CampaignSafetyError(f"R9 Violation: Unauthorized path or directory traversal detected in '{campaign_id}'.")
 
-    # 2. Verify campaign directory authorization
-    camp_dir = os.path.abspath(campaign_dir or os.path.join(campaigns_root, campaign_id))
+    # 2. Verify campaign directory authorization with symlink resolution
+    camp_dir = os.path.realpath(campaign_dir or os.path.join(campaigns_root, campaign_id))
+    real_campaigns_root = os.path.realpath(campaigns_root)
     try:
-        common = os.path.commonpath([camp_dir, campaigns_root])
+        common = os.path.commonpath([camp_dir, real_campaigns_root])
     except ValueError:
         raise CampaignSafetyError(f"R9 Violation: Campaign path '{camp_dir}' is outside authorized campaigns root.")
 
-    if os.path.abspath(common) != os.path.abspath(campaigns_root):
-        raise CampaignSafetyError(f"R9 Violation: Campaign path '{camp_dir}' escapes authorized directory '{campaigns_root}'.")
+    if common != real_campaigns_root or os.path.dirname(camp_dir) != real_campaigns_root:
+        raise CampaignSafetyError(f"R9 Violation: Campaign path '{camp_dir}' escapes authorized directory '{real_campaigns_root}'.")
 
     if not os.path.isdir(camp_dir):
         raise CampaignSafetyError(f"R9 Violation: Campaign directory does not exist or is unauthorized: '{camp_dir}'")
@@ -241,13 +286,12 @@ def build_self_contained_html(
     Returns:
         tuple of (html_string, campaign_configs, gameplay_manifest, world_bible_data)
     """
-    root = os.path.abspath(repo_root or ROOT)
-    ui_dir = os.path.join(root, "UI")
-    camp_dir = os.path.join(root, "CAMPAIGNS", campaign_id)
+    root, camp_dir = resolve_authorized_campaign_dir(campaign_id, repo_root=repo_root)
+    ui_dir = os.path.realpath(os.path.join(root, "UI"))
 
     # 1. Read UI template and styles
-    index_html = read_text(os.path.join(ui_dir, "index.html"))
-    styles_css = read_text(os.path.join(ui_dir, "styles.css"))
+    index_html = read_text(os.path.join(ui_dir, "index.html"), allowed_root=ui_dir)
+    styles_css = read_text(os.path.join(ui_dir, "styles.css"), allowed_root=ui_dir)
 
     # 2. Build campaign data
     campaign_configs = build_campaign_configs(camp_dir, campaign_id)
