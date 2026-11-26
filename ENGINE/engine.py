@@ -597,6 +597,18 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
             if "offered_choices" not in core_state:
                 core_state["offered_choices"] = ModeValidator.extract_offered_choices(campaign, workspace_root)
 
+            campaign_rules = []
+            if campaign_dir and os.path.isdir(campaign_dir):
+                cfg_path = os.path.join(campaign_dir, "campaign_config.json")
+                if os.path.isfile(cfg_path):
+                    try:
+                        with open(cfg_path, "r", encoding="utf-8") as cf:
+                            loaded_cfg = json.load(cf)
+                            if isinstance(loaded_cfg.get("rules"), list):
+                                campaign_rules = loaded_cfg["rules"]
+                    except Exception:
+                        campaign_rules = []
+
             resolve_config = {
                 "operational_mode": mode,
                 "proposed_zoom": proposed_zoom,
@@ -604,7 +616,8 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
                 "proposed_intensity": proposed_intensity,
                 "proposed_location": proposed_location,
                 "causal_justification": causal_justification,
-                "explicit_permission": explicit_permission
+                "explicit_permission": explicit_permission,
+                "rules": campaign_rules,
             }
 
             try:
@@ -1085,8 +1098,8 @@ class EngineRequestHandler(BaseHTTPRequestHandler):
                     print(f"[Engine] Cloud Gemini call failed: {e}. Falling back to rule-based simulation.")
 
         # Local Engine Simulation adhering strictly to CORE-002, CORE-003 receipts & numbered choices
-        next_turn = turn + 1
-        state = payload.get("state") if isinstance(payload.get("state"), dict) else (outcome.next_state if outcome else None)
+        next_turn = outcome.next_state.get("turn", turn + 1) if (outcome and outcome.next_state) else (turn + 1)
+        state = outcome.next_state if (outcome and outcome.next_state) else (payload.get("state") if isinstance(payload.get("state"), dict) else None)
         summary = self._metric_summary(campaign, state)
         sys_line = f"[SYS: Turn {next_turn}" + (f" | {summary}" if summary else "") + " | Checkpoints: 5/5]"
 

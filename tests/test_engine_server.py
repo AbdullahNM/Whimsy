@@ -153,7 +153,7 @@ class TestEngineServer(unittest.TestCase):
 
         # Verify deterministic SYS receipts and fallback choices
         self.assertIn("[SYS: Turn 246", text)
-        self.assertIn("Energy: 100 / 100", text)
+        self.assertIn("Energy: 95 / 100", text)
         self.assertIn("Stress: 10 / 100", text)
         self.assertIn("Funds: 500 credits", text)
         self.assertIn("### [OPTIONS & TYPABLE REFERENCE]", text)
@@ -464,6 +464,82 @@ class TestEngineServer(unittest.TestCase):
             self.assertEqual(status_replay, 200, body_replay.decode("utf-8"))
             replay_data = json.loads(body_replay.decode("utf-8"))
             self.assertTrue(replay_data.get("retry"))
+
+    def test_nontemplate_turn5_stat_change_and_distinctive_next_choice(self):
+        import tempfile
+        from ENGINE.campaign_builder import scaffold_campaign
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cid = "harbor_chronicle"
+            scaffold_campaign(tmpdir, {"campaign_id": cid, "title": "Harbor Chronicle"})
+            cdir = os.path.join(tmpdir, "CAMPAIGNS", cid)
+            cfg_path = os.path.join(cdir, "campaign_config.json")
+            with open(cfg_path, "r", encoding="utf-8") as cf:
+                cfg = json.load(cf)
+            cfg["rules"] = [
+                {
+                    "match": {"choice_index": 1},
+                    "progression_delta": {"energy": -10},
+                    "next_choices": [
+                        {"index": 1, "text": "Unseal the brine-stained harbor ledger"},
+                        {"index": 2, "text": "Signal the customs skiff from the jetty"},
+                    ],
+                }
+            ]
+            with open(cfg_path, "w", encoding="utf-8") as cf:
+                json.dump(cfg, cf, indent=2)
+
+            pre_turn5_state = {
+                "schema_version": 2,
+                "campaign_id": cid,
+                "turn": 5,
+                "timeline": "Act II",
+                "progression": {
+                    "energy": 80,
+                    "energy_max": 100,
+                    "stress": 15,
+                    "stress_max": 100,
+                    "checkpoint_tokens": 5,
+                    "checkpoint_max": 5,
+                },
+                "purse": {"credits": 500, "display": "500 credits"},
+                "clocks": [],
+                "scene_anchor": {"location": "Bellwether Pier", "context": "Rain lashes the timber.", "time": "Day 2, 05:00"},
+                "pacing_state": {
+                    "elapsed_time_minutes": 40,
+                    "narrative_intensity": 2,
+                    "scheduled_events": [],
+                    "timeline_stamp": "Day 2, 05:00",
+                    "zoom_level": "detailed_scene",
+                },
+                "public_state": {"flags": {}, "conditions": [], "open_threads": []},
+            }
+
+            with patch("ENGINE.engine.ROOT_DIR", tmpdir):
+                status, _, body = execute_request(
+                    "POST",
+                    "/generate",
+                    body=json.dumps({
+                        "action": "1",
+                        "campaign": cid,
+                        "campaign_dir": cdir,
+                        "root_dir": tmpdir,
+                        "currentTurn": 5,
+                        "state": pre_turn5_state,
+                        "commit": True,
+                    }).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                )
+
+            self.assertEqual(status, 200, body.decode("utf-8"))
+            data = json.loads(body.decode("utf-8"))
+            outcome = data["outcome"]
+            self.assertEqual(outcome["next_state"]["turn"], 6)
+            self.assertEqual(outcome["next_state"]["progression"]["energy"], 70)
+            self.assertEqual(outcome["offered_choices"][0]["text"], "Unseal the brine-stained harbor ledger")
+            self.assertIn("Unseal the brine-stained harbor ledger", data["response"])
+            self.assertIn("Energy: 70 / 100", data["response"])
+            self.assertIn("Turn 6", data["response"])
 
     def test_generate_post_deterministic_remediation_strips_formulaic_closings(self):
         """Verify that formulaic turn closings are deterministically stripped and validated."""

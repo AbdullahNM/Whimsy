@@ -51,6 +51,22 @@
       };
     }
 
+    _isNativeBridgeEndpoint(endpoint) {
+      if (!endpoint || typeof endpoint !== 'string') return false;
+      const trimmed = endpoint.trim();
+      try {
+        const parsed = new URL(trimmed, 'http://localhost');
+        const normalizedPath = parsed.pathname.replace(/\/+$/, '').toLowerCase();
+        if (normalizedPath !== '/generate') return false;
+        if (!/^[a-z]+:\/\//i.test(trimmed)) return true;
+        const host = parsed.hostname.toLowerCase();
+        const sameOrigin = typeof window !== 'undefined' && window.location && parsed.origin === window.location.origin;
+        return sameOrigin || host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]';
+      } catch (e) {
+        return /(?:^|\/)generate\/?$/i.test(trimmed) && !/\/api\/generate\/?$/i.test(trimmed);
+      }
+    }
+
     /**
      * Generate narrative prose using local model endpoint (or local Python engine bridge).
      */
@@ -68,10 +84,17 @@
       apiBaseUrl = null,
       pacing = 'standard',
       state = null,
-      commit = true
+      commit = true,
+      forwardCredentials = false,
+      endpointApiKey = null
     }) {
       if (!outcome) {
         throw new Error('LocalNarrator requires a valid deterministic Outcome');
+      }
+
+      const isNativeBridge = this._isNativeBridgeEndpoint(endpoint);
+      if (isNativeBridge && (!state || typeof state !== 'object')) {
+        throw new Error('LocalNarrator requires pre-turn state for the native /generate bridge');
       }
 
       const timeout = timeoutMs || this.defaultTimeoutMs;
@@ -85,28 +108,65 @@
 
         const prompt = this._buildConstrainedPrompt(action, outcome, context);
         const actionStr = typeof action === 'string' ? action : (action.text || String(action.num || ''));
+        const headers = { 'Content-Type': 'application/json' };
 
-        const payload = {
-          prompt: prompt,
-          action: actionStr,
-          outcome: outcome.toDict ? outcome.toDict() : outcome,
-          context: context,
-          campaign: campaign || context.activeConfig?.id || '',
-          currentTurn: currentTurn || outcome.next_state?.turn ? (outcome.next_state.turn - 1) : 1,
-          state: state || outcome.next_state,
-          pacing: pacing || 'standard',
-          apiKey: apiKey || '',
-          provider: provider || '',
-          model: model || '',
-          apiBaseUrl: apiBaseUrl || '',
-          commit: commit,
-          max_tokens: 600,
-          temperature: 0.7
-        };
+        let payload;
+        if (isNativeBridge) {
+          const outcomeTurn = outcome.next_state?.turn != null ? Math.max(1, outcome.next_state.turn - 1) : 1;
+          const resolvedTurn = currentTurn ?? (outcomeTurn);
+          payload = {
+            prompt: prompt,
+            action: actionStr,
+            outcome: outcome.toDict ? outcome.toDict() : outcome,
+            context: context,
+            campaign: campaign || context.activeConfig?.id || '',
+            currentTurn: resolvedTurn,
+            state: state,
+            pacing: pacing || 'standard',
+            commit: commit,
+            max_tokens: 600,
+            temperature: 0.7
+          };
+          if (model) payload.model = model;
+          if (provider) payload.provider = provider;
+          if (apiKey) {
+            payload.apiKey = apiKey;
+            if (apiBaseUrl) payload.apiBaseUrl = apiBaseUrl;
+          }
+        } else {
+          let isChatCompletions = false;
+          try {
+            const parsed = new URL(String(endpoint || ''), 'http://localhost');
+            isChatCompletions = /\/chat\/completions\/?$/i.test(parsed.pathname);
+          } catch (e) {
+            isChatCompletions = /\/chat\/completions\/?$/i.test(String(endpoint || ''));
+          }
+
+          payload = isChatCompletions
+            ? {
+                messages: [{ role: 'user', content: prompt }],
+                max_tokens: 600,
+                temperature: 0.7
+              }
+            : {
+                prompt: prompt,
+                max_tokens: 600,
+                temperature: 0.7
+              };
+
+          if (model && !['local-antigravity', 'local-endpoint'].includes(model) && !/^(openrouter|fastrouter)\//.test(model)) {
+            payload.model = model;
+          }
+
+          const intendedKey = endpointApiKey || (forwardCredentials ? apiKey : null);
+          if (intendedKey) {
+            headers['Authorization'] = `Bearer ${intendedKey}`;
+          }
+        }
 
         const res = await fetch(endpoint, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: headers,
           body: JSON.stringify(payload),
           signal: controller ? controller.signal : undefined
         });
