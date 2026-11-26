@@ -24,13 +24,13 @@ jobs:
         run: |
           set -euo pipefail
           bad=$(git ls-files -- CAMPAIGNS notebooklm_export takeout_extracted \
-                | grep -v '^CAMPAIGNS/template_campaign/' || true)
+                | grep -Ev '^CAMPAIGNS/(template_campaign|sample_campaign)/' || true)
           if [ -n "$bad" ]; then
             echo "::error::Private campaign data is tracked in this public repo:"
             echo "$bad"
             exit 1
           fi
-          echo "OK: only CAMPAIGNS/template_campaign/ is tracked."
+          echo "OK: only public campaigns (template_campaign, sample_campaign) are tracked."
 
       - name: No private paths anywhere in history
         run: |
@@ -39,7 +39,7 @@ jobs:
           bad=$(git log --all --pretty=format: --name-only --diff-filter=A \
                 -- CAMPAIGNS notebooklm_export takeout_extracted \
                 | sort -u | sed '/^$/d' \
-                | grep -v '^CAMPAIGNS/template_campaign/' || true)
+                | grep -Ev '^CAMPAIGNS/(template_campaign|sample_campaign)/' || true)
           if [ -n "$bad" ]; then
             echo "::error::Private campaign data exists in git history:"
             echo "$bad"

@@ -1,4 +1,181 @@
 {
+  "sample_campaign": {
+    "id": "sample_campaign",
+    "operational_mode": "classic_cyoa",
+    "title": "The Cinder Ledger",
+    "genre": "Low-Fantasy Maritime Intrigue & Guild Mystery",
+    "theme": {
+      "bg_dark": "#0d1117",
+      "bg_slate": "#141a22",
+      "bg_card": "#1b232e",
+      "gold_primary": "#d4a84f",
+      "gold_dim": "#8c6d2f",
+      "accent_glow": "rgba(212, 168, 79, 0.2)",
+      "text_ivory": "#ede8df",
+      "font_family": "Georgia, 'Times New Roman', serif"
+    },
+    "metrics": [
+      {
+        "id": "turn",
+        "label": "Turn",
+        "type": "counter",
+        "path": "turn"
+      },
+      {
+        "id": "energy",
+        "label": "Stamina",
+        "type": "progress",
+        "color": "#58a6ff",
+        "path": "progression.energy",
+        "max_path": "progression.energy_max"
+      },
+      {
+        "id": "stress",
+        "label": "Heat",
+        "type": "progress",
+        "color": "#f85149",
+        "path": "progression.stress",
+        "max_path": "progression.stress_max"
+      },
+      {
+        "id": "purse",
+        "label": "Purse",
+        "type": "text",
+        "path": "purse.display"
+      }
+    ],
+    "entity_header": {
+      "title_path": "character.name",
+      "subtitle_path": "character.archetype",
+      "tag_paths": [
+        "character.origin",
+        "character.status",
+        "character.faction"
+      ]
+    },
+    "status_sections": {
+      "progression_bars": {
+        "title": "Vitals & Exposure",
+        "bars": [
+          {
+            "label": "Stamina",
+            "path": "progression.energy",
+            "max_path": "progression.energy_max",
+            "color": "#58a6ff"
+          },
+          {
+            "label": "Heat",
+            "path": "progression.stress",
+            "max_path": "progression.stress_max",
+            "color": "#f85149"
+          }
+        ]
+      },
+      "stat_grid": {
+        "title": "Ledger & Standing",
+        "boxes": [
+          {
+            "label": "Purse",
+            "path": "purse.display"
+          },
+          {
+            "label": "Checkpoints",
+            "path": "progression.checkpoint_tokens",
+            "suffix": "/ 5"
+          },
+          {
+            "label": "Excise Standing",
+            "path": "character.reputation"
+          },
+          {
+            "label": "Assignment",
+            "path": "character.special_trait"
+          }
+        ]
+      },
+      "attributes_grid": {
+        "title": "Field Competencies (1-100 Scale)",
+        "dict_path": "competencies",
+        "max_scale": 100
+      },
+      "inventory_status": {
+        "title": "Key Evidence & Seals",
+        "array_path": "key_evidence",
+        "item_name_key": "name",
+        "item_status_key": "secured",
+        "item_location_key": "location"
+      },
+      "scene_anchor": {
+        "title": "Harbor Position & Tide",
+        "location_path": "scene_anchor.location",
+        "context_path": "scene_anchor.context",
+        "time_path": "scene_anchor.time"
+      }
+    },
+    "style_contract": {
+      "mode": "natural_everyday_english",
+      "max_sentence_words": 35,
+      "prohibited_patterns": [
+        "breathtaking prowess",
+        "like a true prodigy",
+        "little did they know"
+      ],
+      "ban_stem_calculus_jargon": true,
+      "ban_decorative_microsfx": true,
+      "ban_forced_cliffhangers": true,
+      "ban_narrator_praise": true,
+      "strict_style_enforcement": true,
+      "max_style_retries": 2
+    },
+    "sidebar": {
+      "tabs": [
+        {
+          "id": "status-tab",
+          "label": "Dossier",
+          "source": "GAMEPLAY/status.md",
+          "json_source": "GAMEPLAY/status.json"
+        },
+        {
+          "id": "relations-tab",
+          "label": "Contacts & Houses",
+          "source": "GAMEPLAY/relations.md",
+          "json_source": "GAMEPLAY/relations.json"
+        },
+        {
+          "id": "items-tab",
+          "label": "Satchel & Seals",
+          "source": "GAMEPLAY/items.md",
+          "json_source": "GAMEPLAY/items.json"
+        },
+        {
+          "id": "ontology-tab",
+          "label": "Houses & Ties",
+          "json_source": "ontology.json",
+          "type": "ontology"
+        },
+        {
+          "id": "world-tab",
+          "label": "Port Vane Lore",
+          "type": "lore_browser"
+        },
+        {
+          "id": "shadow-tab",
+          "label": "Shadow GM"
+        }
+      ]
+    },
+    "retrieval": {
+      "enabled": true,
+      "max_passages": 5,
+      "char_budget": 16000
+    },
+    "token_budget": {
+      "rules_char_budget": 8000,
+      "world_foundation_char_budget": 6000,
+      "active_turns_budget": 15,
+      "ideas_char_budget": 4000
+    }
+  },
   "template_campaign": {
     "id": "template_campaign",
     "operational_mode": "classic_cyoa",

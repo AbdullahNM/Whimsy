@@ -405,6 +405,46 @@ class TestSchemas(unittest.TestCase):
         self.assertEqual(errors, [], f"Evaluation rubric schema errors: {errors}")
         self.assertEqual(rubric["rubric_id"], "narrator_turn_evaluation_v1")
 
+    # --- Public Sample Campaign Validation Tests ---
+
+    def test_sample_campaign_schemas_parity_and_style(self):
+        sample_dir = os.path.join(ROOT_DIR, "CAMPAIGNS", "sample_campaign")
+        self.assertTrue(os.path.isdir(sample_dir), "CAMPAIGNS/sample_campaign should exist")
+
+        config = self._load_json("CAMPAIGNS/sample_campaign/campaign_config.json")
+        self.assertEqual(SimpleSchemaValidator.validate(config, self.campaign_init_schema), [])
+        self.assertEqual(config["id"], "sample_campaign")
+
+        status = self._load_json("CAMPAIGNS/sample_campaign/GAMEPLAY/status.json")
+        self.assertEqual(SimpleSchemaValidator.validate(status, self.turn_state_schema), [])
+        self.assertEqual(status["campaign_id"], "sample_campaign")
+        self.assertEqual(status["turn"], 6)
+
+        wf = self._load_json("CAMPAIGNS/sample_campaign/WORLD_FOUNDATION/world_foundation.json")
+        self.assertEqual(SimpleSchemaValidator.validate(wf, self.world_foundation_schema), [])
+        self.assertEqual(wf["campaign_id"], "sample_campaign")
+
+        ontology = self._load_json("CAMPAIGNS/sample_campaign/ontology.json")
+        try:
+            import jsonschema
+            jsonschema.validate(instance=ontology, schema=self.ontology_schema)
+        except ImportError:
+            pass
+
+        from ENGINE.transaction_manager import check_state_drift
+        has_drift, reasons = check_state_drift(sample_dir)
+        self.assertFalse(has_drift, f"sample_campaign has state drift: {reasons}")
+
+        from ENGINE.style_contract import StyleContractValidator
+        validator = StyleContractValidator.from_campaign("sample_campaign", ROOT_DIR)
+        active_turns_dir = os.path.join(sample_dir, "TURNS", "ACTIVE")
+        turn_files = sorted(f for f in os.listdir(active_turns_dir) if f.endswith(".md"))
+        self.assertEqual(len(turn_files), 5, "sample_campaign should ship with 5 pre-played turns")
+        for tf in turn_files:
+            with open(os.path.join(active_turns_dir, tf), "r", encoding="utf-8") as f:
+                valid, vios, score = validator.validate_prose(f.read())
+            self.assertTrue(valid, f"{tf} failed style contract: {vios}")
+
 
 if __name__ == "__main__":
     unittest.main()

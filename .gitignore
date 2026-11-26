@@ -7,10 +7,12 @@ backups/
 .DS_Store
 
 # ---- Private / personal data (kept local, never published) ----
-# Only the generic template campaign ships with the repository.
+# Only the generic template campaign and public sample campaign ship with the repository.
 CAMPAIGNS/*
 !CAMPAIGNS/template_campaign/
 !CAMPAIGNS/template_campaign/**
+!CAMPAIGNS/sample_campaign/
+!CAMPAIGNS/sample_campaign/**
 **/GAMEPLAY/telemetry.jsonl
 CAMPAIGNS/*/GAMEPLAY/telemetry.jsonl
 notebooklm_export/

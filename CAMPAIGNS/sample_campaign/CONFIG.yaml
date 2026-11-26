@@ -1,0 +1,7 @@
+campaign_id: sample_campaign
+model: local-antigravity
+temperature: 0.7
+context_turn_budget: 15
+state_schema_version: 2
+resolution_mode: consequence_driven
+public_state_only: true

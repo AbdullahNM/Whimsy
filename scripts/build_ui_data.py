@@ -1,26 +1,35 @@
 #!/usr/bin/env python3
-"""Build the UI's bundled data files from CAMPAIGNS/template_campaign.
+"""Build the UI's bundled data files from public repo campaigns.
 
-The UI ships with the generic template campaign only; private campaigns are
-loaded at runtime via the File System Access API and are never bundled here.
+Ships public campaigns (sample_campaign, template_campaign) if present;
+private campaigns are loaded at runtime via the local engine or File System Access API
+and are never bundled here.
 
 Usage:  python3 scripts/build_ui_data.py
 """
 import json
 import os
 import re
+import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
 UI = os.path.join(ROOT, "UI")
-TEMPLATE = os.path.join(ROOT, "CAMPAIGNS", "template_campaign")
+PUBLIC_CAMPAIGNS = ["sample_campaign", "template_campaign"]
 
 
 def read(path):
+    if not os.path.exists(path):
+        return ""
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
 
 
 def read_json(path):
+    if not os.path.exists(path):
+        return None
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -31,41 +40,71 @@ def write_json(path, data):
         f.write("\n")
 
 
+def _iter_public_campaign_dirs():
+    for cname in PUBLIC_CAMPAIGNS:
+        cdir = os.path.join(ROOT, "CAMPAIGNS", cname)
+        cfg_path = os.path.join(cdir, "campaign_config.json")
+        if os.path.isdir(cdir) and os.path.isfile(cfg_path):
+            yield cname, cdir
+
+
 def build_campaign_configs():
-    config = read_json(os.path.join(TEMPLATE, "campaign_config.json"))
-    return {config["id"]: config}
+    configs = {}
+    for cname, cdir in _iter_public_campaign_dirs():
+        config = read_json(os.path.join(cdir, "campaign_config.json"))
+        if config:
+            configs[config.get("id", cname)] = config
+    return configs
 
 
 def build_gameplay_manifest():
-    config = read_json(os.path.join(TEMPLATE, "campaign_config.json"))
-    cid = config["id"]
-    gameplay = os.path.join(TEMPLATE, "GAMEPLAY")
+    manifest = {}
+    for cname, cdir in _iter_public_campaign_dirs():
+        config = read_json(os.path.join(cdir, "campaign_config.json")) or {}
+        cid = config.get("id", cname)
+        gameplay = os.path.join(cdir, "GAMEPLAY")
 
-    active_dir = os.path.join(TEMPLATE, "TURNS", "ACTIVE")
-    active_turns = []
-    for name in sorted(os.listdir(active_dir)):
-        if name.endswith(".md"):
-            active_turns.append({
-                "name": name,
-                "content": read(os.path.join(active_dir, name)),
-            })
+        active_dir = os.path.join(cdir, "TURNS", "ACTIVE")
+        active_turns = []
+        if os.path.isdir(active_dir):
+            for name in sorted(os.listdir(active_dir)):
+                if name.endswith(".md"):
+                    active_turns.append({
+                        "name": name,
+                        "content": read(os.path.join(active_dir, name)),
+                    })
 
-    entry = {
-        "status": read(os.path.join(gameplay, "status.md")),
-        "relations": read(os.path.join(gameplay, "relations.md")),
-        "items": read(os.path.join(gameplay, "items.md")),
-        "upcoming_hooks": read(os.path.join(gameplay, "upcoming_hooks.md")),
-        "status_json": read_json(os.path.join(gameplay, "status.json")),
-        "relations_json": read_json(os.path.join(gameplay, "relations.json")),
-        "items_json": read_json(os.path.join(gameplay, "items.json")),
-        "active_turns": active_turns,
-        "narrative_steering": read(os.path.join(TEMPLATE, "IDEAS", "narrative_steering.md")),
-    }
-    return {cid: entry}
+        agent_channel = []
+        try:
+            from ENGINE.agent_channel import AgentChannelManager
+            agent_channel = AgentChannelManager(cdir).load_messages(force_disk=True)
+        except Exception:
+            pass
+
+        ontology_json = (
+            read_json(os.path.join(cdir, "ontology.json"))
+            or read_json(os.path.join(cdir, "WORLD_FOUNDATION", "ontology.json"))
+        )
+
+        entry = {
+            "status": read(os.path.join(gameplay, "status.md")),
+            "relations": read(os.path.join(gameplay, "relations.md")),
+            "items": read(os.path.join(gameplay, "items.md")),
+            "upcoming_hooks": read(os.path.join(gameplay, "upcoming_hooks.md")),
+            "status_json": read_json(os.path.join(gameplay, "status.json")) or {},
+            "relations_json": read_json(os.path.join(gameplay, "relations.json")) or {},
+            "items_json": read_json(os.path.join(gameplay, "items.json")) or {},
+            "ontology_json": ontology_json,
+            "active_turns": active_turns,
+            "narrative_steering": read(os.path.join(cdir, "IDEAS", "narrative_steering.md")),
+            "agent_channel": agent_channel,
+        }
+        manifest[cid] = entry
+    return manifest
 
 
-def build_world_bible_data():
-    bible = os.path.join(TEMPLATE, "WORLD_BIBLE")
+def _collect_bible_articles(cdir):
+    bible = os.path.join(cdir, "WORLD_BIBLE")
     data = {}
     if not os.path.isdir(bible):
         return data
@@ -88,6 +127,17 @@ def build_world_bible_data():
         if articles:
             data[cat] = articles
     return data
+
+
+def build_world_bible_data():
+    per_campaign = {}
+    for cname, cdir in _iter_public_campaign_dirs():
+        config = read_json(os.path.join(cdir, "campaign_config.json")) or {}
+        cid = config.get("id", cname)
+        per_campaign[cid] = _collect_bible_articles(cdir)
+    if len(per_campaign) == 1:
+        return next(iter(per_campaign.values()))
+    return per_campaign
 
 
 def main():

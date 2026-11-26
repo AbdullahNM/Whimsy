@@ -1,0 +1,143 @@
+{
+  "schema_version": 2,
+  "campaign_id": "sample_campaign",
+  "turn": 6,
+  "timeline": "Act I — Mid-Morning Quay Interception before the Midday Tide-Gate",
+  "character": {
+    "name": "Corin Hale",
+    "archetype": "Junior Harbor Excise Clerk & Field Auditor",
+    "origin": "Lower Quay",
+    "status": "On Probation",
+    "faction": "Harbor Excise Office",
+    "reputation": "Probationary (Pressured)",
+    "special_trait": "Pier Seven Field Warrant"
+  },
+  "progression": {
+    "energy": 85,
+    "energy_max": 100,
+    "stress": 25,
+    "stress_max": 100,
+    "xp": 25,
+    "xp_threshold": 100,
+    "checkpoint_tokens": 5,
+    "checkpoint_max": 5
+  },
+  "purse": {
+    "gold": 2,
+    "silver": 12,
+    "copper": 8,
+    "display": "2G 12S 8C"
+  },
+  "competencies": {
+    "audit_and_ledger": 38,
+    "dockside_seamanship": 28,
+    "civic_persuasion": 32,
+    "observation_and_locks": 34
+  },
+  "key_evidence": [
+    {
+      "name": "The Cinder Ledger (Half-Charred Manifest)",
+      "secured": true,
+      "location": "Corin's leather satchel (with #P7-088 stub)"
+    },
+    {
+      "name": "Crimson Wax Stamp Sample",
+      "secured": true,
+      "location": "Corin's leather satchel (matched to Vesper yard slip)"
+    },
+    {
+      "name": "Pier Seven Night Tally Log",
+      "secured": true,
+      "location": "Clerk's Cage, Pier Seven"
+    }
+  ],
+  "public_state": {
+    "flags": {
+      "redwing_impounded": true,
+      "crimson_seal_spotted": true,
+      "cinder_ledger_recovered": true,
+      "pitch_arson_confirmed": true,
+      "forged_yard_slip_found": true,
+      "quay_interception_active": true
+    },
+    "conditions": [
+      "Mid-morning harbor mist",
+      "On Probation",
+      "Surrounded at Counting House Gate"
+    ],
+    "open_threads": [
+      "Deliver the Cinder Ledger, pitch-arson proof, and forged bond-slip to Inspector Bren before the midday Tide-Gate opens.",
+      "Identify who authorized the #P7-088 Excise counter-initial and why the crimson-stamped crates were bound for Maren Vesper's vaults.",
+      "Break clear of Maren Vesper's factor-guards and Captain Kestrel's Merrow crew at the Counting House Gate.",
+      "Follow up on the frightened deckhand who sold lamp-tallow near The Lantern Quay."
+    ]
+  },
+  "offered_choices": [
+    {
+      "index": 1,
+      "text": "Hold your ground at the Counting House Gate and demand both Maren Vesper and Captain Kestrel put their salvage claims in writing before Inspector Bren."
+    },
+    {
+      "index": 2,
+      "text": "Tuck the Cinder Ledger tight under your oilskin and sprint down the Ferry Steps onto a skiff bound for Pier Seven and Watch-Sergeant Orin's boom watch. [Cost: 2C]"
+    },
+    {
+      "index": 3,
+      "text": "Play House Merrow against House Vesper: offer Captain Kestrel proof of pine-pitch arson if her crew clears a path past Maren Vesper's guards."
+    },
+    {
+      "index": 4,
+      "text": "Bluff Maren Vesper quietly—claim Inspector Bren already holds a copy of the #P7-088 counter-initial and ask what House Vesper offers to settle before noon."
+    }
+  ],
+  "clocks": [
+    {
+      "id": "tide_gate_audit",
+      "label": "Midday Tide-Gate Audit",
+      "current": 2,
+      "max": 4,
+      "visibility": "known",
+      "advance_trigger": "Hours pass toward midday slack tide without a completed audit."
+    },
+    {
+      "id": "house_interference",
+      "label": "House Interference",
+      "current": 2,
+      "max": 6,
+      "visibility": "suspected",
+      "advance_trigger": "House Merrow or House Vesper agents notice open investigation or rising Heat."
+    }
+  ],
+  "scene_anchor": {
+    "location": "The Lantern Quay — Counting House Gate, Port Vane",
+    "context": "Maren Vesper and her factor-guards block the Pier Seven lane at the Counting House Gate while Captain Kestrel's Merrow crew closes from behind, both eyeing the charred Cinder Ledger in Corin's satchel.",
+    "time": "Day 1, 10:15"
+  },
+  "pacing_state": {
+    "scene_type": "conflict",
+    "scene_objective": "Escape or leverage the double-house interception at the Counting House Gate without losing the Cinder Ledger before Inspector Bren's midday audit.",
+    "narrative_intensity": 3,
+    "zoom_level": "detailed_scene",
+    "elapsed_time_minutes": 240,
+    "timeline_stamp": "Day 1, 10:15",
+    "active_conflicts": [
+      "Maren Vesper's factor-guards and Captain Kestrel's Merrow crew are contesting Corin Hale's custody of the Cinder Ledger at the Counting House Gate."
+    ],
+    "unresolved_intentions": [
+      "Deliver the matched Cinder Ledger, pine-pitch proof, and forged #P7-088 bond-slip to Inspector Bren at Pier Seven before the midday Tide-Gate opens."
+    ],
+    "current_location": "The Lantern Quay — Counting House Gate, Port Vane",
+    "pending_decisions": [
+      "Choose how to break or leverage the standoff with Maren Vesper and Captain Kestrel at the Counting House Gate."
+    ],
+    "pacing_profile": "balanced",
+    "scheduled_events": [
+      {
+        "id": "midday_tide_gate_horn",
+        "trigger_time_minutes": 345,
+        "description": "The midday Tide-Gate horn sounds; the iron harbor chain lowers and the Chief Tide-Master calls for final manifest clearance.",
+        "fired": false
+      }
+    ]
+  }
+}

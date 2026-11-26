@@ -11,7 +11,10 @@
 
 set -uo pipefail
 
-ALLOWED_CAMPAIGN="CAMPAIGNS/template_campaign/"
+ALLOWED_CAMPAIGNS=(
+  "CAMPAIGNS/template_campaign/"
+  "CAMPAIGNS/sample_campaign/"
+)
 FORBIDDEN_ROOTS=("notebooklm_export/" "takeout_extracted/")
 ZERO_SHA="0000000000000000000000000000000000000000"
 
@@ -21,10 +24,16 @@ record() {
   local path="$1"
   case "$path" in
     CAMPAIGNS/*)
-      case "$path" in
-        "$ALLOWED_CAMPAIGN"*) return ;;
-        *) violations+=("$path") ;;
-      esac
+      local allowed=false
+      for ok_prefix in "${ALLOWED_CAMPAIGNS[@]}"; do
+        case "$path" in
+          "$ok_prefix"*) allowed=true ;;
+        esac
+      done
+      if [ "$allowed" = true ]; then
+        return
+      fi
+      violations+=("$path")
       ;;
   esac
   for root in "${FORBIDDEN_ROOTS[@]}"; do
